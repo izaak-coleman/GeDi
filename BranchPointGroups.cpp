@@ -790,10 +790,10 @@ void BranchPointGroups::seedBreakPointBlocks() {
   }
   gsa.shrink_to_fit();
   cout << "GSA size: " << gsa.size()<< endl;
-  for (read_tag const& t : gsa) {
-    cout << t.read_id << ":" << t.orientation << ":" << t.offset << ":"
-         << t.tissue_type << ":" << endl;
-  }
+  //for (read_tag const& t : gsa) {
+  //  cout << t.read_id << ":" << t.orientation << ":" << t.offset << ":"
+  //       << t.tissue_type << ":" << endl;
+  //}
   extractGroups(gsa);
 }
 
