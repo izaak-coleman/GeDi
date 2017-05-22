@@ -480,7 +480,8 @@ void BranchPointGroups::generateConsensusSequence(bool tissue,
   }
   cns_offset = max_offset;
   pair_id = block.id;
-  qual = buildQualityString(cnsCount, cns, tissue);
+  std::fill(qual.begin(), qual.end(), '-');
+  string q_str(cns.size(), '-');
   for (int pos=0; pos < cnsCount[0].size(); pos++) {
     // mask all positions with reads less than >= GSA2_MCT
     int nreads=0;
@@ -489,13 +490,15 @@ void BranchPointGroups::generateConsensusSequence(bool tissue,
     }
     if (nreads < GSA2_MCT) {
       if (tissue == TUMOUR) {
-        qual[pos] = 'X';
+        q_str[pos] = 'X';
       }
       else { // tissue == SWITCHED || tissue == HEALTHY
-        qual[pos] = 'T';
+        q_str[pos] = 'T';
       }
     }
   }
+  buildQualityString(q_str, cnsCount, cns, tissue);
+  qual = std::move(q_str);
   ////// DEBUG
   //std::cout << ((tissue) ? "Healthy" : "Cancer") << " sub-block below" <<
   //std::endl;
@@ -510,6 +513,69 @@ void BranchPointGroups::generateConsensusSequence(bool tissue,
   //std::cout << cns << std::endl << std::endl;
   //std::cout << "QSTRING" << std::endl;
   //std::cout << qual << std::endl;
+}
+
+void BranchPointGroups::buildQualityString(string qual, vector< vector<int> > const& freq_matrix,
+    string const& cns, bool tissue) {
+  // Function steps through each position of the string and
+  // determines whether a position should be masked if:
+  //  -- Cancer: if the number of bases contributing to the 
+  //             consensus base is < CTR then mask. Or, if the 
+  //             number of bases with frequency above the error threshold
+  //             (ALLELIC_ERROR_THRESH) is > 1 then mask.
+  //  -- Health: if the number of bases with frequency above the error threshold
+  //             (ALLELIC_ERROR_THRESH) is > 1 then mask.
+  
+  int m_start{0};
+  for (int i=0; i < freq_matrix[0].size(); i++) {
+    if (freq_matrix[0][i] != -1) {
+      m_start = i;
+      break;
+    }
+  }
+
+  //if (cns.size() == 0) {
+  //  cout << "No consensus sequence! " << endl;
+  //  exit(1);
+  //}
+  for (int pos=0; pos < cns.size(); pos++) {
+
+    // Unique masking logic to cancer reads
+    // The supporting evidence for the chosen consensus
+    // position must be above 4
+    if (tissue == TUMOUR && qual[pos] == '-') { // do not override 'X'
+      int base{0};
+      switch (cns[pos]) {
+        case 'A': base = 0; break;
+        case 'T': base = 1; break;
+        case 'C': base = 2; break;
+        case 'G': base = 3; break;
+      }
+      if (freq_matrix[base][pos + m_start] < GSA2_MCT) {
+        qual[pos] = 'C';
+        continue;
+      }
+    }
+
+    // Determine the number of bases above the error frequency
+    // by the calulation:
+    //      bases / total bases = freq.
+    // bases is equivalent to the number of reads with a base of type given
+    // base. 
+    double total_bases = 0;
+    for (int base = 0; base < 4; base++) {
+      total_bases += freq_matrix[base][pos + m_start];
+    }
+    int n_bases_above_err_freq{0};
+    for(int base = 0; base < 4; base++) {
+      if((freq_matrix[base][pos + m_start] / total_bases) > ALLELIC_FREQ_OF_ERROR) {
+        n_bases_above_err_freq++;
+      }
+    }
+    if (n_bases_above_err_freq > 1) { // Overrides 'X'
+      qual[pos] = 'L';
+    }
+  }
 }
 
 
@@ -1345,81 +1411,11 @@ bool BranchPointGroups::generateConsensusSequence(unsigned int block_idx,
   cns_offset = (max_offset - n_skipped_start_pos);
 
   // set the quality string
-  qual = buildQualityString(align_counter, cns, tissue_type);
+//  qual = buildQualityString(align_counter, cns, tissue_type);
   return false;
   //return DEBUG_BOOL;
 }
 
-string BranchPointGroups::buildQualityString(vector< vector<int> > const& freq_matrix,
-    string const& cns, bool tissue) {
-  // Function steps through each position of the string and
-  // determines whether a position should be masked if:
-  //  -- Cancer: if the number of bases contributing to the 
-  //             consensus base is < CTR then mask. Or, if the 
-  //             number of bases with frequency above the error threshold
-  //             (ALLELIC_ERROR_THRESH) is > 1 then mask.
-  //  -- Health: if the number of bases with frequency above the error threshold
-  //             (ALLELIC_ERROR_THRESH) is > 1 then mask.
-  
-  string q_str("");
-  int m_start{0};
-  for (int i=0; i < freq_matrix[0].size(); i++) {
-    if (freq_matrix[0][i] != -1) {
-      m_start = i;
-      break;
-    }
-  }
-
-  //if (cns.size() == 0) {
-  //  cout << "No consensus sequence! " << endl;
-  //  exit(1);
-  //}
-  for (int pos=0; pos < cns.size(); pos++) {
-
-    // Determine the number of bases above the error frequency
-    // by the calulation:
-    //      bases / total bases = freq.
-    // bases is equivalent to the number of reads with a base of type given
-    // base. 
-    if (tissue == HEALTHY || tissue == TUMOUR) { // || TUMOUR testing
-
-      double total_bases = 0;                     // get total_bases
-      for (int base=0; base < 4; base++) {
-        total_bases += freq_matrix[base][pos + m_start];
-      }
-      int n_bases_above_err_freq{0};
-      for(int base=0; base < 4; base++) {
-        if((freq_matrix[base][pos + m_start] / total_bases) > ALLELIC_FREQ_OF_ERROR) {
-          n_bases_above_err_freq++;
-        }
-      }
-      if (n_bases_above_err_freq > 1) { // then mask
-        q_str += "L";
-        continue;
-      }
-    }
-
-    // Unique masking logic to cancer reads
-    // The supporting evidence for the chosen consensus
-    // position must be above 4
-    if (tissue == TUMOUR) {
-      int base{0};
-      switch (cns[pos]) {
-        case 'A': base = 0; break;
-        case 'T': base = 1; break;
-        case 'C': base = 2; break;
-        case 'G': base = 3; break;
-      }
-      if (freq_matrix[base][pos + m_start] < GSA2_MCT) {
-        q_str += "L";
-        continue;
-      }
-    }
-
-    q_str += "-";
-  }
-  return q_str;
-}
 
 
 string BranchPointGroups::addGaps(int n_gaps) {

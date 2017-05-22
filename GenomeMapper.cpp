@@ -371,15 +371,10 @@ void GenomeMapper::constructSNVFastqData(string const& fastqName) {
     // otherwise, write healthy consensus as a fastq
     // with the SNVs stored in the header parse string
     
-    snv_fq << "@" + cns_pair.mutated + 
-    "[" + to_string(cns_pair.left_ohang) + ";" + 
-    to_string(cns_pair.right_ohang) + ";" + 
-    to_string(cns_pair.pair_id) + "]" << endl;
-
-    snv_fq << cns_pair.non_mutated << endl;
-    snv_fq << "+" << endl;
+    snv_fq << "@" + cns_pair.mutated + "[" + to_string(cns_pair.left_ohang) + ";" + to_string(cns_pair.right_ohang) + ";" + to_string(cns_pair.pair_id) + "]\n"
+              + cns_pair.non_mutated + "\n+\n";
     string qual(cns_pair.non_mutated.size(), '!'); 
-    snv_fq << qual << endl;
+    snv_fq << qual + "\n";
   }
   snv_fq.close();
 }
