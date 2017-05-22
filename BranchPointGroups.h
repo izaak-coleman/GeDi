@@ -88,6 +88,8 @@ private:
 
   std::mutex cancer_extraction_lock;
   std::mutex cout_lock;
+  std::mutex extractGroupsWorkerLock;
+  std::mutex buildConsensusPairLock;
 
   ReadPhredContainer *reads;
   SuffixArray *SA;    // store a pointer to SA for access
@@ -184,7 +186,7 @@ private:
   // Where number of reads is < TRIM_VALUE this sets bases rows at the
   // insufficient position to -1, invalidating the position, as
   // the number of reads must be at least 0.
-
+  void buildConsensusPairsWorker(bp_block* block, bp_block* end);
   void seedBreakPointBlocks();
   // Input: CancerExtraction
   // Output: Loads the groups of cancer specific reads into BreakPointBlocks
@@ -195,6 +197,9 @@ private:
   // Output: BreakPointBlocks with loaded blocks
   // Details: Forms the groups of contiguous reads with LCP >= 30 
   // using seed and extension 
+
+  void extractGroupsWorker(unsigned int seed_index, unsigned int to,
+                           std::vector<read_tag> const* gsa_ptr);
 
   std::string buildQualityString(std::vector<std::vector<int> > const&
       freq_matrix, std::string const& cns, bool tissue);

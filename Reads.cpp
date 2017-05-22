@@ -22,7 +22,6 @@ KSEQ_INIT(gzFile, gzread);    // initialize .gz parser
 using namespace std;
 static const int TERM_CHAR_CORRECTION = 1;
 static const int MIN_SUFFIX_SIZE = 30;
-static const int DISTAL_TRIM = 0;
 
 // QUALITY_THRESH and PHRED_20 are used
 // to discard reads where the percentage
@@ -37,12 +36,10 @@ static const string TERM_CHAR = "$";        // GSA termination char.
 
 ReadPhredContainer::ReadPhredContainer(string const& inputFile){
   minimum_suffix_size = MIN_SUFFIX_SIZE;
-  distal_trim_len = DISTAL_TRIM;
   vector<file_and_type> datafiles;
   maxLen = 0;
 
   parseInputFile(inputFile, datafiles);
-  cout << "DISTAL_TRIM: " << DISTAL_TRIM << endl;
   cout << "Loaded " << datafiles.size() << " data files." << endl;
   for(int i=0; i < datafiles.size(); i++) {
     cout << "Extracting data from " << datafiles[i].first << "..." << endl;
@@ -194,8 +191,8 @@ void ReadPhredContainer::qualityProcessRawData(vector<fastq_t> *r_data,
         if (read_substrs[i].length() > maxLen) {   // determine longest read
           maxLen = read_substrs[i].length();
         }
-        processed_reads->push_back(performDistalTrim(read_substrs[i]) + TERM_CHAR);
-        processed_phreds->push_back(performDistalTrim(phred_substrs[i]));
+        processed_reads->push_back(read_substrs[i] + TERM_CHAR);
+        processed_phreds->push_back(phred_substrs[i]);
       }
     }
   }

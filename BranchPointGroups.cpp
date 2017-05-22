@@ -75,23 +75,91 @@ BranchPointGroups::BranchPointGroups(SuffixArray &_SA,
   //printAlignedBlocks();
   // buildCancerCNS()
   cout << "Number of seed blocks: " << SeedBlocks.size() << endl;
-  int skipped = 0;
-  for (bp_block &block : SeedBlocks) {
+  cout << "builing consensus pairs " << endl;
+
+  unsigned int elementsPerThread = SeedBlocks.size() / N_THREADS;
+  bp_block* from = &SeedBlocks[0];
+  bp_block* to   = (&SeedBlocks[0] + elementsPerThread);
+  vector<thread> w;
+  for (int i = 0; i < N_THREADS; i++) {
+    w.push_back(
+      std::thread(&BranchPointGroups::buildConsensusPairsWorker, this, from,to)
+    );
+    from = to;
+    if (i == N_THREADS - 2) {
+      to = (&SeedBlocks[0] + SeedBlocks.size());
+    } else {
+      to += elementsPerThread;
+    }
+  }
+  for (auto& t : w) {
+    t.join();
+  }
+  cout <<  "Number of cns pairs: " << consensus_pairs.size() << endl;
+  //for (bp_block &block : SeedBlocks) {
+  //  consensus_pair pair;
+  //  pair.left_ohang = pair.right_ohang = 0;
+  //  generateConsensusSequence(TUMOUR, block, pair.mut_offset, pair.pair_id, pair.mutated, pair.mqual);
+
+  //  if (block.block.size() > COVERAGE_UPPER_THRESHOLD) {
+  //    block.block.clear();
+  //    continue;
+  //  }
+  //  extractNonMutatedAlleles(block, pair);
+  //  generateConsensusSequence(HEALTHY, block, pair.nmut_offset, pair.pair_id, pair.non_mutated, pair.nqual);
+  //  if (block.block.size() > COVERAGE_UPPER_THRESHOLD) {
+  //    block.clear();
+  //    continue;
+  //  }
+  //  block.clear();
+  //  trimHealthyConsensus(pair); // MUST trim healthy first
+  //  trimCancerConsensus(pair);
+  //  bool low_quality_block {false};
+  //  maskLowQualityPositions(pair, low_quality_block);
+  //  if (low_quality_block) {
+  //    continue;
+  //  }
+
+  //  if (pair.mutated.empty() || pair.non_mutated.empty()) {
+  //    continue;
+  //  }
+  //  consensus_pairs.push_back(pair);
+  //}
+  /// cout << "Pair id: " << pair.pair_id << endl;
+  /// cout << "Tumour: " << endl;
+  /// cout << pair.mutated << endl;
+  /// cout << pair.mqual << endl;
+  /// cout << "Block mutated offset: " << pair.mut_offset << endl;
+  /// cout << "Healthy: " << endl;
+  /// cout << pair.non_mutated << endl;
+  /// cout << pair.nqual << endl;
+  /// cout << "Block non_mut offset: " << pair.nmut_offset << endl;
+  //} 
+  //Cout << "n skipped: " << skipped << endl;
+  //Cout << "DONE BUILDING PAIRS" << endl;
+  //extractNonMutatedAlleles();
+  //outputFromBPB("/data/ic711/point5.txt");
+  cout << "Finished break point block construction" << endl;
+}
+
+void BranchPointGroups::buildConsensusPairsWorker(bp_block* block, bp_block* end){
+ vector<consensus_pair> localThreadStore;
+  for(; block < end; block++) {
     consensus_pair pair;
     pair.left_ohang = pair.right_ohang = 0;
-    generateConsensusSequence(TUMOUR, block, pair.mut_offset, pair.pair_id, pair.mutated, pair.mqual);
+    generateConsensusSequence(TUMOUR, *block, pair.mut_offset, pair.pair_id, pair.mutated, pair.mqual);
 
-    if (block.block.size() > COVERAGE_UPPER_THRESHOLD) {
-      block.block.clear();
+    if (block->block.size() > COVERAGE_UPPER_THRESHOLD) {
+      block->clear();
       continue;
     }
-    extractNonMutatedAlleles(block, pair);
-    generateConsensusSequence(HEALTHY, block, pair.nmut_offset, pair.pair_id, pair.non_mutated, pair.nqual);
-    if (block.block.size() > COVERAGE_UPPER_THRESHOLD) {
-      block.clear();
+    extractNonMutatedAlleles(*block, pair);
+    generateConsensusSequence(HEALTHY, *block, pair.nmut_offset, pair.pair_id, pair.non_mutated, pair.nqual);
+    if (block->block.size() > COVERAGE_UPPER_THRESHOLD) {
+      block->clear();
       continue;
     }
-    block.clear();
+    block->clear();
     trimHealthyConsensus(pair); // MUST trim healthy first
     trimCancerConsensus(pair);
     bool low_quality_block {false};
@@ -101,26 +169,15 @@ BranchPointGroups::BranchPointGroups(SuffixArray &_SA,
     }
 
     if (pair.mutated.empty() || pair.non_mutated.empty()) {
-      skipped++;
       continue;
     }
-    consensus_pairs.push_back(pair);
-   // cout << "Pair id: " << pair.pair_id << endl;
-   // cout << "Tumour: " << endl;
-   // cout << pair.mutated << endl;
-   // cout << pair.mqual << endl;
-   // cout << "Block mutated offset: " << pair.mut_offset << endl;
-   // cout << "Healthy: " << endl;
-   // cout << pair.non_mutated << endl;
-   // cout << pair.nqual << endl;
-   // cout << "Block non_mut offset: " << pair.nmut_offset << endl;
-  } 
-  cout << "n skipped: " << skipped << endl;
-  cout << "DONE BUILDING PAIRS" << endl;
-  cout << "Adding non-mutated alleles to blocks." << endl;
-  //extractNonMutatedAlleles();
-  //outputFromBPB("/data/ic711/point5.txt");
-  cout << "Finished break point block construction" << endl;
+    localThreadStore.push_back(pair);
+  }
+
+  std::lock_guard<std::mutex> lock(buildConsensusPairLock);
+  for (consensus_pair const& p : localThreadStore) {
+    consensus_pairs.push_back(p);
+  }
 }
 
 void BranchPointGroups::maskLowQualityPositions(consensus_pair & pair, bool &
@@ -439,7 +496,7 @@ void BranchPointGroups::generateConsensusSequence(bool tissue,
       }
     }
   }
-  //////// DEBUG
+  ////// DEBUG
   //std::cout << ((tissue) ? "Healthy" : "Cancer") << " sub-block below" <<
   //std::endl;
   //std::cout << "Block id: " << block.id  << std::endl;
@@ -482,8 +539,6 @@ BranchPointGroups::~BranchPointGroups() {
 
 void BranchPointGroups::extractCancerSpecificReads() {
   unsigned int elements_per_thread = (SA->getSize()  / N_THREADS);
-  cout << "Elements per thread" << elements_per_thread << endl;
-  cout << "GSA size: " << SA->getSize() << endl;
   vector<thread> workers;
   unsigned int from=0, to= elements_per_thread;
   for(int i=0; i < N_THREADS; i++) {
@@ -504,21 +559,33 @@ void BranchPointGroups::extractCancerSpecificReads() {
   }
 }
 
-unsigned int BranchPointGroups::backUpSearchStart(unsigned int seed_index) {
+
+unsigned int BranchPointGroups::backUpSearchStart(unsigned int seedIndex) {
   // Thread work division could split a group in half. It is possible
   // that the split could result in a non-mutated region looking as
   // if it only contains cancer reads. 
-  if (seed_index == 0) {
-    return seed_index;
+  if (seedIndex == 0) {
+    return seedIndex;
   }
-  unsigned int start_point = seed_index - 1;
-  while (::computeLCP(SA->getElem(start_point), SA->getElem(seed_index),
+  unsigned int startPoint = seedIndex;
+  while (::computeLCP(SA->getElem(startPoint), SA->getElem(seedIndex - 1),
         *reads) >= reads->getMinSuffixSize()) {
-    start_point--;
-    if (start_point == 0) break;
+    seedIndex--;
+    if (seedIndex == 0) break;
   }
-  return start_point;
+  return seedIndex;
 }
+
+//unsigned int BranchPointGroups::backUpSearchStart(unsigned int seedIndex) {
+//  if (seedIndex == 0) return seedIndex;
+//  unsigned int startPoint = seedIndex - 1;
+//  while(::computeLCP(SA->getElem(startPoint), SA->getElem(seedIndex), *reads) >=
+//      reads->getMinSuffixSize()) {
+//    startPoint--;
+//    if (startPoint == 0) break;
+//  }
+//  return startPoint;
+//}
 
 void BranchPointGroups::extractionWorker(unsigned int seed_index, unsigned int to) {
   set<unsigned int> threadExtr;
@@ -789,7 +856,7 @@ void BranchPointGroups::seedBreakPointBlocks() {
     arrayBlocks[i].clear();
   }
   gsa.shrink_to_fit();
-  cout << "GSA size: " << gsa.size()<< endl;
+  cout << "GSA2 size: " << gsa.size()<< endl;
   //for (read_tag const& t : gsa) {
   //  cout << t.read_id << ":" << t.orientation << ":" << t.offset << ":"
   //       << t.tissue_type << ":" << endl;
@@ -859,47 +926,109 @@ char BranchPointGroups::revCompCharacter(char ch, bool rc) {
   }
 }
 
-//// New version: Takes into account CTR and does not have rare case bug
 void BranchPointGroups::extractGroups(vector<read_tag> const& gsa) {
-  // Adding from, to parameters, in order to make logic compatible
-  // with later multithreading modifications.
-  unsigned int to{gsa.size()}, seed_index{0};
-  unsigned int extension{seed_index + 1};
-  unsigned int block_id;
-
-  // < to is thread safe, != gsa.size() - 1 is rare case bound safe
-  while (seed_index < to && seed_index != gsa.size() - 1) {
+  unsigned int elementsPerThread = gsa.size() / N_THREADS;
+  vector<thread> workers;
+  unsigned int from{0}, to{elementsPerThread};
+  for (int i=0; i < N_THREADS; i++) {
+    workers.push_back(
+    std::thread(&BranchPointGroups::extractGroupsWorker, this, from, to,
+      &gsa)
+    );
+    from = to;
+    if (i == N_THREADS - 2) {
+      to = gsa.size();
+    }
+    else {
+      to += elementsPerThread;
+    }
+  }
+  for (auto &t : workers) {
+    t.join();
+  }
+}
+void BranchPointGroups::extractGroupsWorker(unsigned int seedIndex,
+                                            unsigned int to,
+                                            vector<read_tag> const* gsa_ptr) {
+  vector<bp_block> localThreadStore;
+  unsigned int block_id{seedIndex};
+  vector<read_tag> const& gsa = *gsa_ptr;
+  // backup to block start
+  if (seedIndex !=  0) {
+    unsigned int startPoint = seedIndex;
+    while (computeLCP(gsa[startPoint], gsa[seedIndex-1]) >= reads->getMinSuffixSize()) {
+      seedIndex--;
+      if (seedIndex == 0) break;
+    }
+  }
+  unsigned int extension{seedIndex + 1};
+  while (seedIndex < to && seedIndex != gsa.size() - 1) {
     bp_block block;
-    // compute group size - avoid inserting here to avoid unnecessary mallocs
-    while (computeLCP(gsa[seed_index], gsa[extension]) >= reads->getMinSuffixSize()) {
+    while (computeLCP(gsa[seedIndex], gsa[extension]) >= reads->getMinSuffixSize()) {
       extension++;
       if (extension == gsa.size()) break;
     }
-    // Make alloc if group at or above CTR
-    if (extension - seed_index >= GSA2_MCT) {
-      for (int i=seed_index; i < extension; i++) block.block.insert(gsa[i]); 
-    }
-    else {    // continue, discarding group
-      seed_index = extension++;
+    if (extension - seedIndex >= GSA2_MCT) {
+      for (int i = seedIndex; i < extension; i++) block.block.insert(gsa[i]);
+    } else {
+      seedIndex = extension++;
       continue;
     }
-  
-    // Load group into break point blocks
     block.id = block_id;
-    //BlockSeeds.push_back(block);     // for loss of sensitivity by way of 2
-    SeedBlocks.push_back(block);
+    localThreadStore.push_back(block);
     block_id++;
-    seed_index = extension++;
+    seedIndex = extension++;
   }
-
-  if (seed_index == gsa.size() - 1 && GSA2_MCT == 1) {
+  if (seedIndex == gsa.size() - 1 && GSA2_MCT == 1) {
     bp_block block;
-    block.block.insert(gsa[seed_index]);
+    block.block.insert(gsa[seedIndex]);
     block.id = block_id;
-    //BlockSeeds.push_back(block);      // for loss of sensitivity by way of 2
-    SeedBlocks.push_back(block);
+    localThreadStore.push_back(block);
   }
+  std::lock_guard<std::mutex> lock(extractGroupsWorkerLock);
+  SeedBlocks.insert(SeedBlocks.end(), localThreadStore.begin(), localThreadStore.end());
 }
+////// Newer version: Takes into account CTR and does not have rare case bug
+//void BranchPointGroups::extractGroups(vector<read_tag> const& gsa) {
+//  // Adding from, to parameters, in order to make logic compatible
+//  // with later multithreading modifications.
+//  unsigned int to{gsa.size()}, seed_index{0};
+//  unsigned int extension{seed_index + 1};
+//  unsigned int block_id;
+//
+//  // < to is thread safe, != gsa.size() - 1 is rare case bound safe
+//  while (seed_index < to && seed_index != gsa.size() - 1) {
+//    bp_block block;
+//    // compute group size - avoid inserting here to avoid unnecessary mallocs
+//    while (computeLCP(gsa[seed_index], gsa[extension]) >= reads->getMinSuffixSize()) {
+//      extension++;
+//      if (extension == gsa.size()) break;
+//    }
+//    // Make alloc if group at or above CTR
+//    if (extension - seed_index >= GSA2_MCT) {
+//      for (int i=seed_index; i < extension; i++) block.block.insert(gsa[i]); 
+//    }
+//    else {    // continue, discarding group
+//      seed_index = extension++;
+//      continue;
+//    }
+//  
+//    // Load group into break point blocks
+//    block.id = block_id;
+//    //BlockSeeds.push_back(block);     // for loss of sensitivity by way of 2
+//    SeedBlocks.push_back(block);
+//    block_id++;
+//    seed_index = extension++;
+//  }
+//
+//  if (seed_index == gsa.size() - 1 && GSA2_MCT == 1) {
+//    bp_block block;
+//    block.block.insert(gsa[seed_index]);
+//    block.id = block_id;
+//    //BlockSeeds.push_back(block);      // for loss of sensitivity by way of 2
+//    SeedBlocks.push_back(block);
+//  }
+//}
 
 //// Old version: Does not take into account CTR, and rare case bug
 //void BranchPointGroups::extractGroups(vector<read_tag> &gsa) {

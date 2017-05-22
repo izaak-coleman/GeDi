@@ -47,6 +47,7 @@ MIN_SUFFIX(min_suffix) {
   parallelGenRadixSA(min_suffix);
   
 //  printReadsInGSA("/data/ic711/point2.txt");
+  cout << "GSA1 size: " << SA.size() << endl;
 }
 
 
@@ -76,7 +77,7 @@ void SuffixArray::parallelGenRadixSA(int min_suffix) {
   unsigned int radixSASize;
 
   // Build binary search arrays and suffix array in parallel
-
+  cout << "Making SA" << endl;
   vector<pair<unsigned int, unsigned int> > healthyBSA;
   vector<pair<unsigned int, unsigned int> > tumourBSA;
 
@@ -98,6 +99,7 @@ void SuffixArray::parallelGenRadixSA(int min_suffix) {
 
   // begin parallel suffix array construction
   cout << "radix sa size " << radixSASize << endl;
+  cout << "Making GSA" << endl;
   vector<thread> workers;
   vector<vector<Suffix_t>> array_blocks;
   unsigned int elements_per_thread = (radixSASize/N_THREADS);
