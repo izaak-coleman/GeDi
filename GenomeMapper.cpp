@@ -387,7 +387,6 @@ void GenomeMapper::parseSamFile(vector<SamEntry> &alignments, string filename) {
   boost::regex rgx_header("(@).*");
   string line;
   while(getline(snv_sam, line)) {
-
     if (boost::regex_match(line, rgx_header)) {	// skip past headers
       continue;
     }

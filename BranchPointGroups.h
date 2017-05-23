@@ -201,7 +201,7 @@ private:
   void extractGroupsWorker(unsigned int seed_index, unsigned int to,
                            std::vector<read_tag> const* gsa_ptr);
 
-  void buildQualityString(std::string & qual, std::vector<std::vector<int> > const&
+  std::string buildQualityString(std::vector<std::vector<int> > const&
       freq_matrix, std::string const& cns, bool tissue);
   // Function steps through each position of the string and
   // determines whether a position should be masked if:
