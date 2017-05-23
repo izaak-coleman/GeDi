@@ -124,7 +124,7 @@ private:
   // genomic location. We can then check the econt ratio of this group, 
   // identifying if the group consists of cancer specific reads.
 
-
+  bool excessLowQuality(consensus_pair & pair);
 
   bool getSuffixesFromLeft(int seed_index, 
                            std::set<read_tag, read_tag_compare> &block,
@@ -201,7 +201,7 @@ private:
   void extractGroupsWorker(unsigned int seed_index, unsigned int to,
                            std::vector<read_tag> const* gsa_ptr);
 
-  std::string buildQualityString(std::vector<std::vector<int> > const&
+  void buildQualityString(std::string & qual, std::vector<std::vector<int> > const&
       freq_matrix, std::string const& cns, bool tissue);
   // Function steps through each position of the string and
   // determines whether a position should be masked if:
@@ -228,6 +228,7 @@ private:
   void trimHealthyConsensus(consensus_pair & pair);
   void trimCancerConsensus(consensus_pair & pair);
   void maskLowQualityPositions(consensus_pair & pair, bool & low_quality);
+  void maskLowQualityPositions(consensus_pair & pair);
 
   
 public:

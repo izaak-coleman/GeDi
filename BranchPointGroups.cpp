@@ -161,13 +161,12 @@ void BranchPointGroups::buildConsensusPairsWorker(bp_block* block, bp_block* end
       continue;
     }
     block->clear();
-    trimHealthyConsensus(pair); // MUST trim healthy first
-    trimCancerConsensus(pair);
-    bool low_quality_block {false};
-    maskLowQualityPositions(pair, low_quality_block);
-    if (low_quality_block) {
+    if (excessLowQuality(pair)) {
       continue;
     }
+    trimHealthyConsensus(pair); // MUST trim healthy first
+    trimCancerConsensus(pair);
+    maskLowQualityPositions(pair);
 
     if (pair.mutated.empty() || pair.non_mutated.empty()) {
       continue;
@@ -180,7 +179,7 @@ void BranchPointGroups::buildConsensusPairsWorker(bp_block* block, bp_block* end
     consensus_pairs.push_back(p);
   }
 }
-bool exccessLowQuality(consensus_pair & pair) {
+bool BranchPointGroups::excessLowQuality(consensus_pair & pair) {
   int numLowQuality{0};
   for (int pos=0; pos < pair.mutated.size(); pos++) {
     if (pair.mqual[pos] == 'L' || pair.nqual[pos] == 'L' || pair.nqual[pos] == 'B') {
@@ -190,6 +189,15 @@ bool exccessLowQuality(consensus_pair & pair) {
   if (numLowQuality > MAX_LOW_CONFIDENCE_POS) return true;
   else return false;
 }
+
+void BranchPointGroups::maskLowQualityPositions(consensus_pair & pair) {
+  for (int pos=0; pos < pair.mutated.size(); pos++) {
+    if (pair.mqual[pos] != '-' || pair.nqual[pos + pair.left_ohang] != '-') {
+      pair.mutated[pos] = pair.non_mutated[pos + pair.left_ohang];
+    }
+  }
+}
+
 void BranchPointGroups::maskLowQualityPositions(consensus_pair & pair, bool &
     low_quality) {
   int low_quality_count{0};
@@ -233,11 +241,16 @@ void BranchPointGroups::trimHealthyConsensus(consensus_pair & pair) {
   // the number of reads contributing to each consensus character is
   // >= GSA2_MCT
   int left_arrow = 0, right_arrow= pair.nqual.size() - 1;
-  for(; right_arrow >= 0 && pair.nqual[right_arrow] == 'T'; right_arrow--);
+  for(; right_arrow >= 0 && 
+        (pair.nqual[right_arrow] == 'T' ||
+         pair.nqual[right_arrow] == 'B'); right_arrow--);
   right_arrow++;
   pair.nqual.erase(right_arrow);
   pair.non_mutated.erase(right_arrow);
-  for(; left_arrow < pair.nqual.size() && pair.nqual[left_arrow] == 'T'; left_arrow++);
+
+  for(; left_arrow < pair.nqual.size() && 
+        (pair.nqual[left_arrow] == 'T' ||
+         pair.nqual[left_arrow] == 'B'); left_arrow++);
   pair.nqual.erase(0, left_arrow);
   pair.non_mutated.erase(0, left_arrow);
   pair.nmut_offset -= left_arrow;
