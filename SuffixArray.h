@@ -26,14 +26,15 @@ private:
       unsigned int to, unsigned int startOfTumour, int min_suf);
 
   void buildBinarySearchArrays(
-      std::vector<std::pair<unsigned int, unsigned int> >
-    *healthyBSA, std::vector<std::pair<unsigned int, unsigned int> > *tumourBSA);
+      std::vector<std::pair<unsigned int, unsigned int> > *healthyBSA, 
+      std::vector<std::pair<unsigned int, unsigned int> > *tumourBSA);
 
   void generateBSA(std::vector<std::pair<unsigned int, unsigned int> > &BSA,
-      bool type);
+                   bool type);
 
   void generateParallelRadix(unsigned long long **radixSA, 
-      unsigned int *startOfTumour, unsigned int *sizeOfRadixSA);
+                             unsigned int *startOfTumour, 
+                             unsigned int *sizeOfRadixSA);
 
   std::string concatenateReads(bool type);
 
@@ -45,8 +46,8 @@ public:
   unsigned int getSize();
 
   std::pair<unsigned int, unsigned int> 
-    binarySearch(std::vector<std::pair<unsigned int, 
-        unsigned int> > &BSA, unsigned int suffix_index);
+  binarySearch(std::vector<std::pair<unsigned int,  unsigned int> > &BSA, 
+               unsigned int suffix_index);
 };
 /*
   void buildGSAFile(std::vector<Suffix_t> &GSA, std::string filename);

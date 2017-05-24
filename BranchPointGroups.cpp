@@ -23,17 +23,7 @@
 #include "GenomeMapper.h"
 
 #include "benchmark.h"
-
-
 using namespace std;
-//static const int N_THREADS = 64;
-//static const int GSA2_MCT = 4;
-//static const int COVERAGE_UPPER_THRESHOLD = 150;
-//static const int GSA1_MCT  = 1;
-//static const int GSA2_MCT = 4;
-//static const char MIN_PHRED_QUAL = '7';
-//static const double ALLELIC_FREQ_OF_ERROR = 0.1;
-
 
 BranchPointGroups::BranchPointGroups(SuffixArray &_SA, 
                                      ReadPhredContainer &_reads,

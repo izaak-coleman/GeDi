@@ -45,13 +45,11 @@ void SuffixArray::parallelGenRadixSA(int min_suffix) {
       std::thread(&SuffixArray::buildBinarySearchArrays, this, 
         &healthyBSA, &tumourBSA)
   );
-
   BSA_and_SA.push_back(
       std::thread(&SuffixArray::generateParallelRadix, this, 
         &radixSA, &startOfTumour, &radixSASize)
   );
   for(auto & t : BSA_and_SA) t.join();
-
   // Construct Generalized Suffix Array
   cout << "radix sa size " << radixSASize << endl;
   cout << "Making GSA" << endl;
@@ -110,35 +108,6 @@ void SuffixArray::transformSuffixArrayBlock(vector<Suffix_t> *block,
     }
     s.read_id = rcPair.first;
     block->push_back(s);
-
-    //if(radixSA[i] < startOfTumour) { // HEALTHY
-    //  pair<unsigned int, unsigned int > read_concat_tup = 
-    //    binarySearch(*healthyBSA, radixSA[i]);
-    //  s.offset = radixSA[i] - read_concat_tup.second;
-    //  if (reads->getReadByIndex(read_concat_tup.first, HEALTHY).size() - s.offset
-    //      <= reads->getMinSuffixSize()) { 
-    //    continue;
-    //  }
-    //  else{
-    //    s.read_id = read_concat_tup.first;
-    //    s.type = HEALTHY;
-    //    block->push_back(s);
-    //  }
-    //}
-    //else { // TUMOUR
-    //  pair<unsigned int, unsigned int > read_concat_tup = 
-    //    binarySearch(*tumourBSA, radixSA[i]-startOfTumour);
-    //  s.offset = (radixSA[i] - startOfTumour) - read_concat_tup.second;
-    //  if (reads->getReadByIndex(read_concat_tup.first, TUMOUR).size() - s.offset
-    //      <= reads->getMinSuffixSize()) { 
-    //    continue;
-    //  }
-    //  else{
-    //    s.read_id = read_concat_tup.first;
-    //    s.type = TUMOUR;
-    //    block->push_back(s);
-    //  }
-    //}
   }
 }
 
@@ -151,22 +120,12 @@ void SuffixArray::buildBinarySearchArrays(
 
 void SuffixArray::generateBSA(
      vector<pair<unsigned int, unsigned int>> &BSA, bool type) {
-
-  
-  unsigned int index_in_concat = 0;
-
+  unsigned int indexInConcat {0};
   BSA.reserve(reads->getSize(type));
-  pair<unsigned int, unsigned int> zeroPos(0,0);
-  BSA.push_back(zeroPos);
-
-  for(unsigned int i=1; i < reads->getSize(type); i++) { 
-    pair<unsigned int, unsigned int> read_total;
-    index_in_concat += reads->getReadByIndex(i-1, type).size();
-
-    read_total.first = i;
-    read_total.second = index_in_concat;    // start pos of read in concat
-
-    BSA.push_back(read_total);
+  BSA.push_back(pair<unsigned int, unsigned int>(0,0));
+  for(unsigned int i = 1; i < reads->getSize(type); i++) { 
+    indexInConcat += reads->getReadByIndex(i-1, type).size();
+    BSA.push_back(pair<unsigned int, unsigned int>(i,indexInConcat));
   }
 }
 
@@ -183,30 +142,20 @@ void SuffixArray::generateParallelRadix(unsigned long long **radixSA,
 }
 
 pair<unsigned int, unsigned int> 
-            SuffixArray::binarySearch(
-                  vector<pair<unsigned int, unsigned int> > &BSA, 
-                  unsigned int suffix_index) {
-
+SuffixArray::binarySearch(vector<pair<unsigned int, unsigned int> > &BSA, 
+                  unsigned int suffixIndex) {
   unsigned int right = BSA.size();
   unsigned int left = 0;
   unsigned int mid;
-
   // binary search to home in on read
   while(left < right) {
     mid = left + ((right - left) / 2);
-
-    if(suffix_index == BSA[mid].second) {
-        return BSA[mid];
-    }
-    else if (suffix_index > BSA[mid].second) {
-      left = mid+1;
-    }
-    else {
-      right = mid;
-    }
+    if(suffixIndex == BSA[mid].second)  return BSA[mid];
+    else if (suffixIndex > BSA[mid].second) left = mid+1;
+    else right = mid;
   }
   left--;
-  return BSA[left]; // left should be on the seq
+  return BSA[left]; // left on the tuple
 }
 
 string SuffixArray::concatenateReads(bool type) {
