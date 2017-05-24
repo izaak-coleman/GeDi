@@ -50,7 +50,6 @@ SamEntry::SamEntry(string const& entry) {
 
 try {
     string header = split_result[0];  // load header for later parsing
-
     // Load sam fields, then erase from field list
     for (int i = 1; i < 11; i++) {
       if (i == FLAG || i == POS || i == MAPQ) {
@@ -60,7 +59,6 @@ try {
         fields[i] = split_result[i];
       }
     }
-
     // parse the fastq header field
     vector<string> header_subs;
     // split off the cancer cns
@@ -80,7 +78,7 @@ try {
     if (fields.size() > 11) {
       // extract bwa optional fields
       split_result.erase(split_result.begin(), split_result.begin() + 11);
-  
+      // CONSIDER MAKING MAP
       fields[NM] = startsWith("NM", split_result);
       fields[MD] = startsWith("MD", split_result);
       fields[AS] = startsWith("AS", split_result);
@@ -104,8 +102,6 @@ catch(...) {
 }
 
 string SamEntry::startsWith(string const& tok, vector<string> const& fields) {
-
-
   for (string const& s : fields) {
     if (tok == s.substr(0, 2)) return s;
   }
@@ -116,9 +112,8 @@ void SamEntry::snv_push_back(int v) {
   SNVLocations.push_back(v);
 }
 
-int SamEntry::snvLocSize() { return SNVLocations.size();}
+int SamEntry::snvLocSize() {return SNVLocations.size();}
 int SamEntry::snvLocation(int idx) {return SNVLocations[idx];}
-void SamEntry::setSNVLocation(int idx, int val) {SNVLocations[idx] = val;}
 bool SamEntry::containsIndel() {
   string cigar = get<string>(SamEntry::CIGAR);
   if (cigar.find('I') || cigar.find('D')) {
@@ -127,3 +122,6 @@ bool SamEntry::containsIndel() {
   return false;
 }
 
+/*
+void SamEntry::setSNVLocation(int idx, int val) {SNVLocations[idx] = val;}
+ */
