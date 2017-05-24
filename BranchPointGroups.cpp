@@ -1,4 +1,5 @@
 // BranchPointGroups.cpp
+// CLEANUP
 #include <vector>
 #include <iostream>
 #include <fstream>
