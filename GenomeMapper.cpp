@@ -16,22 +16,8 @@
 
 using namespace std;
 
-static const int MUT_CODE = 0;
-static const int FLAG = 1;
-static const int CHR = 2;
-static const int AL_INDEX = 3;
-static const int AL_CNS = 9;
-static const int MISMATCHES = 18;
-static const int SNV = 1;
-static const int SSV = 2;
-static const int LSV = 3;
-static const int MUT_CNS = 1;
-
-
-
 static const int REVERSE_FLAG = 16;
 static const int FORWARD_FLAG = 0;
-
 
 GenomeMapper::GenomeMapper(BranchPointGroups &bpgroups, 
                            ReadPhredContainer &reads,
@@ -42,7 +28,6 @@ GenomeMapper::GenomeMapper(BranchPointGroups &bpgroups,
                            int min_mapq):
                            MIN_MAPQ(min_mapq),
                            CHR(chr) {
-
   this->reads = &reads;
   this->BPG = &bpgroups;
   if (outpath[outpath.size()-1] != '/') outpath += "/";
@@ -50,33 +35,138 @@ GenomeMapper::GenomeMapper(BranchPointGroups &bpgroups,
          samName(outpath + basename + ".sam"),
          outName(outpath + basename + ".SNV_results");
 
-//  buildConsensusPairs();
   cout << "Writing fastq" << endl;
   constructSNVFastqData(fastqName);
   cout << "Aligning consensus pairs with Bowtie2" << endl;
-
-  // Call Bowtie2
   string command_aln("./bowtie2-2.3.1/bowtie2 -x " + bwt_idx + " -U " +
                      fastqName + " -S " + samName);
   system(command_aln.c_str());
-
   vector<SamEntry> alignments;
   cout << "Parsing sam" << endl;
   parseSamFile(alignments, samName);
   cout << "Identifying SNV" << endl;
   identifySNVs(alignments);
-
-//  printAlignmentStructs(alignments);
   outputSNVToUser(alignments, outName);
 }
 
-//void GenomeMapper::callBowtie2() {
-//  cout << "Calling Bowtie2" << endl;
-//  string command_aln = 
-//    "./bowtie2-2.3.1/bowtie2 -x " + bwt_idx + " -U " + fastqName + " -S " samName;
-//  system(command_aln.c_str());
-//}
+void GenomeMapper::constructSNVFastqData(string const& fastqName) {
+  ofstream snv_fq;
+  snv_fq.open(fastqName.c_str());
+  for (int i = 0; i < BPG->cnsPairSize(); i++) {
+    consensus_pair &cns_pair = BPG->getPair(i);
+    string qual(cns_pair.non_mutated.size(), '!'); 
+    snv_fq << "@" + cns_pair.mutated + "[" + to_string(cns_pair.left_ohang) + 
+              ";" + to_string(cns_pair.right_ohang) + ";" + 
+              to_string(cns_pair.pair_id) + "]\n" + cns_pair.non_mutated 
+              + "\n+\n" + qual + "\n";
+  }
+  snv_fq.close();
+}
 
+void GenomeMapper::parseSamFile(vector<SamEntry> &alignments, string filename) {
+  ifstream snvSam(filename);
+  boost::regex rgx_header("(@).*");
+  string line;
+  while(getline(snvSam, line)) {
+    if (boost::regex_match(line, rgx_header)) continue;
+    SamEntry entry(line); 
+    if (entry.get<string>(SamEntry::RNAME) != CHR) continue;
+    if(entry.get<int>(SamEntry::MAPQ) < MIN_MAPQ)  continue; // MAPQ filter
+    alignments.push_back(entry);
+  }
+  snvSam.close();
+}
+
+
+void GenomeMapper::identifySNVs(vector<SamEntry> &alignments) {
+  for (SamEntry & entry : alignments) {
+    if(entry.get<int>(SamEntry::FLAG) == FORWARD_FLAG) {
+      countSNVs(entry, entry.get<int>(SamEntry::LEFT_OHANG));
+    }
+    else if (entry.get<int>(SamEntry::FLAG) == REVERSE_FLAG) {
+      entry.set(SamEntry::HDR, reverseComplementString(entry.get<string>(SamEntry::HDR))); 
+      countSNVs(entry, entry.get<int>(SamEntry::RIGHT_OHANG)); // invert overhangs due to rev comp
+    }
+  }
+}
+
+void GenomeMapper::countSNVs(SamEntry &alignment, int ohang) {
+  string mutated = alignment.get<string>(SamEntry::HDR);
+  string nonMutated = alignment.get<string>(SamEntry::SEQ);
+  // indel signature
+  for(int i=0; i < mutated.size() - 1; i++) {
+    if (mutated[i] != nonMutated[i + ohang] &&
+        mutated[i+1] != nonMutated[i+1 + ohang]) {
+      return;
+    }
+  }
+  // SNV at start
+  if (mutated[0] != nonMutated[0 + ohang] &&
+      mutated[1] == nonMutated[1 + ohang]) {
+      alignment.snv_push_back(0); 
+  }
+  // SNV at end 
+  int cnsLen = mutated.size();
+  if (mutated[cnsLen-1] != nonMutated[cnsLen-1 + ohang] &&
+      mutated[cnsLen-2] == nonMutated[cnsLen-2 + ohang]) {
+      alignment.snv_push_back(cnsLen-1);
+  }
+  // SNV in body
+  for (int i=1; i < mutated.size() - 1; i++) {
+    if (mutated[i-1] == nonMutated[i-1 + ohang] &&
+        mutated[i] != nonMutated[i + ohang] &&
+        mutated[i+1] == nonMutated[i+1 + ohang] ) {
+      alignment.snv_push_back(i);
+    }
+  }
+}
+bool GenomeMapper::compareSNVLocations(const single_snv &a, const single_snv &b) {
+  return a.position < b.position;
+}
+
+void GenomeMapper::outputSNVToUser(vector<SamEntry> &alignments, string outName) {
+  vector<single_snv> separate_snvs;
+  for(SamEntry & entry : alignments) {
+    for(int i=0; i < entry.snvLocSize(); i++) {
+      int snv_index = entry.snvLocation(i);
+      int overhang = 0;
+      if (entry.get<int>(SamEntry::FLAG) == FORWARD_FLAG) {
+        overhang = entry.get<int>(SamEntry::LEFT_OHANG);
+      }
+      else if (entry.get<int>(SamEntry::FLAG) == REVERSE_FLAG) {
+        overhang = entry.get<int>(SamEntry::RIGHT_OHANG);
+      }
+
+      single_snv snv;
+      snv.chr = entry.get<string>(SamEntry::RNAME);
+      snv.position = (entry.get<int>(SamEntry::POS) + snv_index + overhang); // location of snv
+      snv.healthy_base = entry.get<string>(SamEntry::SEQ)[snv_index + overhang];
+      snv.mutation_base = entry.get<string>(SamEntry::HDR)[snv_index];
+      snv.pair_id = entry.get<int>(SamEntry::BLOCK_ID);
+      separate_snvs.push_back(snv);
+    }
+  }
+  // sort the snvs 
+  std::sort(separate_snvs.begin(), separate_snvs.end(), compareSNVLocations);
+  
+  ofstream report(outName);
+  report << "Mut_ID\tType\tChr\tPos\tNormal_NT\tTumor_NT\n";
+  unsigned int i=0;
+  for(single_snv &snv : separate_snvs) {
+    report << i << "\t" << "SNV\t" << snv.chr << "\t"
+           << snv.position << "\t"
+           << snv.healthy_base << "\t" 
+           << snv.mutation_base << "\t"
+           << snv.pair_id
+           << "\n";
+    i++;
+  }
+  report.close();
+}
+
+
+
+/*
 void GenomeMapper::callBWA() {
   cout << "Calling bwa..." << endl;
 
@@ -91,7 +181,6 @@ void GenomeMapper::callBWA() {
 
   cout << "Finished bwa call." << endl;
 }
-
 void GenomeMapper::buildConsensusPairs() {
   // generate consensus pair for each breakpoint block
   // and then add starting gaps to align sequence pair
@@ -144,7 +233,6 @@ void GenomeMapper::maskLowQualityPositions(consensus_pair & pair, bool &low_qual
 
   //if (num_low_quality_positions > MAX_LOW_CONF_POSITIONS) low_quality = true;
 }
-
 //void GenomeMapper::buildConsensusPairs() {
 //  // generate consensus pair for each breakpoint block
 //  // and then add starting gaps to align sequence pair
@@ -280,8 +368,6 @@ void GenomeMapper::maskLowQualityPositions(consensus_pair & pair, bool &low_qual
 //  }
 //  cout << "number of low conf: " << number_of_low_conf_positions << endl;
 //}
-
-
 void GenomeMapper::trimCancerConsensus(consensus_pair & pair) {
   // Trim portions of the cancer consensus sequence that are
   // longer than heathy. Leave healthy if longer.
@@ -305,8 +391,6 @@ void GenomeMapper::trimCancerConsensus(consensus_pair & pair) {
   }
   // else, equal length. Do nothing
 }
-
-
 void GenomeMapper::printMutation(char healthy, char cancer, ofstream &mut_file) {
   mut_file << healthy <<  ", " << cancer << endl;
 }
@@ -334,13 +418,6 @@ void GenomeMapper::printAlignmentStructs(vector<SamEntry> &alignments) {
   }
 }
 
-void GenomeMapper::printGaps(int gaps) {
-  for(; gaps > 0; gaps--) {
-    cout << "-";
-  }
-}
-
-
 void GenomeMapper::printConsensusPairs() {
   for(consensus_pair cns_pair : consensus_pairs) {
     cout << "Mutation Sequence:" << endl;
@@ -355,49 +432,9 @@ void GenomeMapper::printConsensusPairs() {
     cout << endl << endl;
   }
 }
-
-
-void GenomeMapper::constructSNVFastqData(string const& fastqName) {
-  ofstream snv_fq;
-  snv_fq.open(fastqName.c_str());
-
-  for (int i = 0; i < BPG->cnsPairSize(); i++) {
-    consensus_pair &cns_pair = BPG->getPair(i);
-//    if(cns_pair.mutations.SNV_pos.size() == 0) {    // REMOVE IF on 14/11/16
-//      continue;
-//    }
-    
-    // otherwise, write healthy consensus as a fastq
-    // with the SNVs stored in the header parse string
-    
-    snv_fq << "@" + cns_pair.mutated + "[" + to_string(cns_pair.left_ohang) + ";" + to_string(cns_pair.right_ohang) + ";" + to_string(cns_pair.pair_id) + "]\n"
-              + cns_pair.non_mutated + "\n+\n";
-    string qual(cns_pair.non_mutated.size(), '!'); 
-    snv_fq << qual + "\n";
-  }
-  snv_fq.close();
-}
-
-
-
-void GenomeMapper::parseSamFile(vector<SamEntry> &alignments, string filename) {
-  ifstream snv_sam(filename);	// open alignment file
-  
-  boost::regex rgx_header("(@).*");
-  string line;
-  while(getline(snv_sam, line)) {
-    if (boost::regex_match(line, rgx_header)) {	// skip past headers
-      continue;
-    }
-   
-    SamEntry entry(line);     // parse the entry into a SamEntry
-    if (entry.get<string>(SamEntry::RNAME) != CHR) {
-      continue;
-    }
-    if(entry.get<int>(SamEntry::MAPQ) < MIN_MAPQ) {
-      continue;
-    }
-    alignments.push_back(entry);
+void GenomeMapper::printGaps(int gaps) {
+  for(; gaps > 0; gaps--) {
+    cout << "-";
   }
 }
 
@@ -427,37 +464,6 @@ void GenomeMapper::printSingleAlignment(SamEntry &entry) {
   cout << endl << endl;
 }
 
-string GenomeMapper::reverseComplementString(string s){
-  string revcomp = "";
-
-  for(int i = s.size()-1; i >= 0; i--) {
-  // travel in reverse and switch for complementary
-    switch(s[i]) {
-
-      case 'A':{
-        revcomp += "T";
-        break;
-       }
-
-      case 'T':{
-        revcomp += "A";
-        break;
-      }
-
-      case 'C':{
-        revcomp += "G";
-        break;
-      }
-
-      case 'G':{
-        revcomp += "C";
-        break;
-      }
-    }
-  }
-
-  return revcomp;
-}
 
 void GenomeMapper::correctReverseCompSNV(vector<SamEntry> &alignments) {
 
@@ -474,110 +480,6 @@ void GenomeMapper::correctReverseCompSNV(vector<SamEntry> &alignments) {
         entry.setSNVLocation(i, entry.get<string>(SamEntry::HDR).size() - entry.snvLocation(i));
       }
     }
-  }
-}
-
-void GenomeMapper::identifySNVs(vector<SamEntry> &alignments) {
-  for (SamEntry & entry : alignments) {
-      if(entry.get<int>(SamEntry::FLAG) == FORWARD_FLAG) {
-        countSNVs(entry, entry.get<int>(SamEntry::LEFT_OHANG));
-      }
-      else if (entry.get<int>(SamEntry::FLAG) == REVERSE_FLAG) {
-        entry.set(SamEntry::HDR, reverseComplementString(entry.get<string>(SamEntry::HDR))); 
-        countSNVs(entry, entry.get<int>(SamEntry::RIGHT_OHANG)); // invert overhangs due to rev comp
-      }
-  }
-}
-void GenomeMapper::countSNVs(SamEntry &alignment, int ohang) {
-  string mutated = alignment.get<string>(SamEntry::HDR);
-  string non_mutated = alignment.get<string>(SamEntry::SEQ);
-  // indel signature
-  for(int i=0; i < mutated.size() - 1; i++) {
-    if (mutated[i] != non_mutated[i + ohang] &&
-        mutated[i+1] != non_mutated[i+1 + ohang]) {
-      return;
-    }
-  }
-
-
-  // SNV at start
-  if (mutated[0] != non_mutated[0 + ohang] &&
-      mutated[1] == non_mutated[1 + ohang]) {
-      alignment.snv_push_back(0); 
-  }
-
-  // SNV at end 
-  int cns_len = mutated.size();
-  if (
-      mutated[cns_len-1] != 
-      non_mutated[cns_len-1 + ohang] &&
-      mutated[cns_len-2] == 
-      non_mutated[cns_len-2 + ohang]
-      ) {
-      alignment.snv_push_back(cns_len-1);
-  }
-
-  // SNV in body
-
-  for (int i=1; i < mutated.size() - 1; i++) {
-    if (mutated[i-1] == non_mutated[i-1 + ohang] &&
-        mutated[i] != non_mutated[i + ohang] &&
-        mutated[i+1] == non_mutated[i+1 + ohang] ) {
-      alignment.snv_push_back(i);
-    }
-  }
-}
-
-
-
-bool GenomeMapper::compareSNVLocations(const single_snv &a, const single_snv &b) {
-  return a.position < b.position;
-}
-
-
-void GenomeMapper::outputSNVToUser(vector<SamEntry> &alignments, string outName) {
-
-
-  // load each snv into a separate struct, so each can be easily sorted
-
-  vector<single_snv> separate_snvs;
-  for(SamEntry & entry : alignments) {
-    for(int i=0; i < entry.snvLocSize(); i++) {
-      int snv_index = entry.snvLocation(i);
-      int overhang = 0;
-      if (entry.get<int>(SamEntry::FLAG) == FORWARD_FLAG) {
-        overhang = entry.get<int>(SamEntry::LEFT_OHANG);
-      }
-      else if (entry.get<int>(SamEntry::FLAG) == REVERSE_FLAG) {
-        overhang = entry.get<int>(SamEntry::RIGHT_OHANG);
-      }
-
-      single_snv snv;
-      snv.chr = entry.get<string>(SamEntry::RNAME);
-      snv.position = (entry.get<int>(SamEntry::POS) + snv_index + overhang); // location of snv
-      snv.healthy_base = entry.get<string>(SamEntry::SEQ)[snv_index + overhang];
-      snv.mutation_base = entry.get<string>(SamEntry::HDR)[snv_index];
-      snv.pair_id = entry.get<int>(SamEntry::BLOCK_ID);
-
-      separate_snvs.push_back(snv);
-    }
-  }
-
-  // sort the snvs 
-  std::sort(separate_snvs.begin(), separate_snvs.end(), compareSNVLocations);
-  
-  ofstream report(outName);
-  report << "Mut_ID\tType\tChr\tPos\tNormal_NT\tTumor_NT" << endl;
-
-  unsigned int i=0;
-  for(single_snv &snv : separate_snvs) {
-    report << i << "\t" << "SNV\t" << snv.chr << "\t"
-           << snv.position << "\t"
-           << snv.healthy_base << "\t" 
-           << snv.mutation_base << "\t"
-           << snv.pair_id
-           << endl;
-    i++;
   }
 }
 
@@ -601,6 +503,20 @@ string GenomeMapper::generateParseString(mutation_classes &m) {
   return mutation_string;
 }
 
+
+string GenomeMapper::reverseComplementString(string const& s){
+  string revcomp = "";
+  for(int i = s.size()-1; i >= 0; i--) {
+  // travel in reverse and switch for complementary
+    switch(s[i]) {
+      case 'A': revcomp += "T"; break;
+      case 'T': revcomp += "A"; break;
+      case 'C': revcomp += "G"; break;
+      case 'G': revcomp += "C"; break;
+    }
+  }
+  return revcomp;
+}
 //void GenomeMapper::countSNVs() {
 //
 //
@@ -651,3 +567,5 @@ string GenomeMapper::generateParseString(mutation_classes &m) {
 //    }
 //  }
 //}
+
+ */
