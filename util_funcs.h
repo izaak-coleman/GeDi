@@ -22,6 +22,11 @@ struct mutation_classes{
   std::vector<int> SNV_pos;
 };
 
+void split_string(std::string s, std::string tokens, std::vector<std::string>
+    &fields);
+
+std::string reverseComplementString(std::string const& s);
+
 struct consensus_pair {
   std::string mutated;
   std::string non_mutated;

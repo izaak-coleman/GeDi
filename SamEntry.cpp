@@ -3,7 +3,7 @@
 #include <map>
 #include <boost/any.hpp> // used to make map with different Value types
 
-#include "string.h"
+#include "util_funcs.h"
 #include "SamEntry.h"
 
 using namespace std;

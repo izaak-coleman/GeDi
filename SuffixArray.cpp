@@ -13,10 +13,6 @@
 #include <algorithm>
 #include <thread>
 #include "radix.h"
-#include "string.h" // split_string()
-
-
-
 #include "Suffix_t.h"
 #include "util_funcs.h"
 #include "SuffixArray.h"
