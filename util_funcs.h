@@ -5,19 +5,15 @@
 #include <string>
 #include <utility>
 
-
-
 #include "Suffix_t.h"
 
-class ReadPhredContainer;       // forward decl.
-
-enum {TUMOUR, HEALTHY, SWITCHED};
-enum {LEFT, RIGHT};         // distinguish, paired end type
-
+class ReadPhredContainer; // Forward decl. for use of returnStart/EndIterator()
+enum {TUMOUR, HEALTHY, SWITCHED}; // Data type
+enum {LEFT, RIGHT}; // Orientation in memory
 static const int MIN_SUFFIX = 30;
 
 int computeLCP(Suffix_t &isuf, Suffix_t &jsuf, ReadPhredContainer &reads);
-// Returns the longest common prefix between isuf and jsuf suffixes
+
 struct mutation_classes{
   std::vector<int> SNV_pos;
 };
