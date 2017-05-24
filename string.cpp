@@ -17,34 +17,16 @@ void split_string(string s, string tokens, vector<string> &split_strings) {
   }
 }
 
-string reverseComplementString(string s){
+string reverseComplementString(string const& s){
   string revcomp = "";
-
   for(int i = s.size()-1; i >= 0; i--) {
   // travel in reverse and switch for complementary
     switch(s[i]) {
-
-      case 'A':{
-        revcomp += "T";
-        break;
-       }
-
-      case 'T':{
-        revcomp += "A";
-        break;
-      }
-
-      case 'C':{
-        revcomp += "G";
-        break;
-      }
-
-      case 'G':{
-        revcomp += "C";
-        break;
-      }
+      case 'A': revcomp += "T"; break;
+      case 'T': revcomp += "A"; break;
+      case 'C': revcomp += "G"; break;
+      case 'G': revcomp += "C"; break;
     }
   }
-
   return revcomp;
 }

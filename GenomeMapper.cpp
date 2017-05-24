@@ -11,7 +11,6 @@
 #include "BranchPointGroups.h"
 #include "Reads.h"
 #include "util_funcs.h"
-#include "string.h"
 #include "SamEntry.h"
 #include "benchmark.h"
 
