@@ -26,29 +26,6 @@ private:
 
 
  
-  // MERGE SORT FUNCTIONS
-  void sort(unsigned int from, unsigned int to, unsigned int level);
-  // recursive divide function or lexMergeSort
-  
-  void merge(unsigned int from, unsigned int mid, unsigned int to);
-  // conquer function of lexMergeSort
-  
-  std::vector<Suffix_t> *copyOf(unsigned int from, unsigned int to);
-  // SA copy function used by merge. Returns a pointer to a subsection
-  // of SA spanning from indicies [from, to). On the heap
-  
-  bool lexCompare(Suffix_t &lhs, Suffix_t &rhs);
-  // Function lexiographically compares two suffixes, returning true if 
-  // lhs is before rhs, false otherwise. 
-
-
-  void loadUnsortedSuffixes(uint8_t min_suffix);
-  // Function reads through Text (DNA reads) generating a suffix_t for 
-  // each suffix of each read, and loads into SA
-
-  void lexMergeSort();
-  // Functin lexicographically sorts the suffixes in SA, by the end of this
-  // function SA has been transformed into an actual suffix Array
 
 
 
@@ -74,12 +51,6 @@ private:
 
 
   // MERGE_RADIX FUNCTINOS 
-  void constructTotalRadixSA(uint8_t min_suffix);
-  // this function uses radixSA from (Sanguthevar Rajasekaran, Marius Nicolae, 
-  // 2014). The function contruct in parallel two suffix arrays, 
-  // one for each tissue type using radixSA, it then computes a genealizes
-  // suffix array using Suffix_t types, then finally
-  // merges the two suffix arraus
 
   void generalizedRadixSA(std::vector<Suffix_t> *TissueSA, 
       bool type, uint8_t min_suffix);
@@ -136,6 +107,40 @@ public:
   // Outputs (idx,type) tuples
 
 };
+/*
+  void constructTotalRadixSA(uint8_t min_suffix);
+  // this function uses radixSA from (Sanguthevar Rajasekaran, Marius Nicolae, 
+  // 2014). The function contruct in parallel two suffix arrays, 
+  // one for each tissue type using radixSA, it then computes a genealizes
+  // suffix array using Suffix_t types, then finally
+  // merges the two suffix arraus
+
+  // MERGE SORT FUNCTIONS
+  
+  bool lexCompare(Suffix_t &lhs, Suffix_t &rhs);
+  // Function lexiographically compares two suffixes, returning true if 
+  // lhs is before rhs, false otherwise. 
+
+
+  void loadUnsortedSuffixes(uint8_t min_suffix);
+  // Function reads through Text (DNA reads) generating a suffix_t for 
+  // each suffix of each read, and loads into SA
+
+  void lexMergeSort();
+  // Functin lexicographically sorts the suffixes in SA, by the end of this
+  // function SA has been transformed into an actual suffix Array
+
+  void sort(unsigned int from, unsigned int to, unsigned int level);
+  // recursive divide function or lexMergeSort
+  
+  void merge(unsigned int from, unsigned int mid, unsigned int to);
+  // conquer function of lexMergeSort
+  
+  std::vector<Suffix_t> *copyOf(unsigned int from, unsigned int to);
+  // SA copy function used by merge. Returns a pointer to a subsection
+  // of SA spanning from indicies [from, to). On the heap
+
+*/
 
 
 #endif 

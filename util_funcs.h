@@ -35,5 +35,4 @@ struct consensus_pair {
   int right_ohang;
   mutation_classes mutations;
 };
-
 #endif

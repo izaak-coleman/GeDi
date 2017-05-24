@@ -25,7 +25,7 @@ private:
   const int MIN_SUFFIX_SIZE;
   unsigned int maxLen;
   // Index correspondence between Reads/Phreds
-  std::vector<std::string> HealthyReads
+  std::vector<std::string> HealthyReads;
   std::vector<std::string> HealthyPhreds;
   std::vector<std::string> TumourReads;
   std::vector<std::string> TumourPhreds;

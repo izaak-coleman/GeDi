@@ -231,97 +231,6 @@ void SuffixArray::generateParallelRadix(unsigned long long **radixSA,
 
 // RADIXSAMERGECONSTRUCTOINFUNCS
 
-void SuffixArray::constructTotalRadixSA(uint8_t min_suffix) {
-
-  // local suffix arrays
-  vector<Suffix_t> healthy_SA;
-  vector<Suffix_t> tumour_SA;
-
-  // buill local suffix arrays in parallel
-
-  vector<thread> tissue_SA_threads;
-
-  // thread for healthy 
-  tissue_SA_threads.push_back(
-      std::thread(&SuffixArray::generalizedRadixSA, this,
-                  &healthy_SA, 
-                  HEALTHY, min_suffix)
-      );
- 
-  // thread for tumour
-  tissue_SA_threads.push_back(
-      std::thread(&SuffixArray::generalizedRadixSA, this,
-        &tumour_SA, 
-        TUMOUR, min_suffix)
-      );
-
-  // wait for threads to finish
-  for(auto &thread : tissue_SA_threads) {
-    thread.join();
-  }
-
-
-
-  SA.reserve(healthy_SA.size() + tumour_SA.size()); // make room
-
-  bool end_of_healthy = false;
-  bool end_of_tumour = false; // not for long...lets hope ;)
-
-  unsigned int tind=0, hind=0;
-
-  cout << "Merging tissue general suffix arrays to build final suffix " << 
-    "array " << endl;
-
-
-  while ((tind < tumour_SA.size()) || (hind < healthy_SA.size())) {
-
-    // bound checks...
-    if(hind == healthy_SA.size()) {
-      end_of_healthy = true;
-    }
-
-    if(tind == tumour_SA.size()) {
-      end_of_tumour = true;
-    }
-
-
-    // one has reached end, so add all of other
-    if(end_of_healthy) {
-      SA.push_back(tumour_SA[tind]);
-      tind++;
-    }
-
-    else if(end_of_tumour) {
-      SA.push_back(healthy_SA[hind]);
-      hind++;
-    }
-
-    else {  // noone reached end so add based on lex order
-      string::iterator h_start, h_end, t_start, t_end;
-
-      t_start = reads->returnStartIterator(tumour_SA[tind]);
-      t_end   = reads->returnEndIterator(tumour_SA[tind]);
-
-      h_start = reads->returnStartIterator(healthy_SA[hind]);
-      h_end   = reads->returnEndIterator(healthy_SA[hind]);
-
-
-      if(lexicographical_compare(t_start, t_end, h_start, h_end)) {
-        SA.push_back(tumour_SA[tind]);
-        tind++;
-      }
-      else {
-        SA.push_back(healthy_SA[hind]);
-        hind++;
-      }
-
-    }
-
-  }
-
-  cout << "Done with suffix array build" << endl;
-
-}
 
 void SuffixArray::generalizedRadixSA(vector<Suffix_t> *TissueSA, bool type,
     uint8_t min_suf) {
@@ -445,7 +354,182 @@ string SuffixArray::concatenateReads(bool type) {
 
 
 
+// PUBLIC HELPER FUNCTIONS
+
+
+
+
+
+
+
+void SuffixArray::buildGSAFile(vector<Suffix_t> &GSA, string filename) {
+  if (filename.substr(filename.size() - EXT.size()) != EXT){
+    filename += EXT;
+  }
+  ofstream gsa_file;
+  gsa_file.open(filename);
+
+  for(int i = 0; i < GSA.size(); i++) {
+    string next_suf = "";
+    next_suf += (to_string(GSA[i].read_id) + ",");
+    next_suf += (to_string(GSA[i].offset)  + ",");
+    next_suf += to_string(GSA[i].type);
+    gsa_file << next_suf << endl;
+  }
+}
+
+void SuffixArray::constructGSAFromFile(vector<Suffix_t> &GSA, string filename) {
+  ifstream gsa_file;
+  gsa_file.open(filename);
+  string next_line;
+
+  while (getline(gsa_file, next_line)) {
+    vector<string> elements;
+    split_string(next_line, ",", elements); // split.gsa line into suffix fields
+    Suffix_t suf;
+
+    if (elements.size() == NUM_FIELDS) {
+      suf.read_id = stoi(elements[READ_ID_IDX]);    // load data
+      suf.offset = stoi(elements[OFFSET_IDX]);
+      suf.type = stoi(elements[TYPE_IDX]);
+      GSA.push_back(suf);
+    }
+  }
+}
+
+
+void SuffixArray::printSuffixData() {
+  for(Suffix_t s : SA) {
+    cout << "read_id: " << s.read_id <<  " --- " 
+         << "offset: "  << s.offset  <<  " --- "
+         << std::boolalpha 
+         << "tissue: " << ((s.type) ? "HEALTHY" : "TUMOUR") 
+         << endl;
+  }
+}
+
+void SuffixArray::printSuffixArray(std::string const& filename) {
+  ofstream file(filename);
+  for (Suffix_t & s : SA) {
+    file << reads->returnSuffix(s) << endl;
+  }
+  file.close();
+}
+void SuffixArray::printSuffixes() {
+  for(Suffix_t s : SA) {
+    cout << reads->returnSuffix(s) << endl;
+  }
+}
+
+Suffix_t & SuffixArray::getElem(int index) {
+  if (index >= SA.size() || index < 0) {
+    cout << "getElem() out of bounds" << endl;
+    exit(1);
+  }
+  return SA[index];
+}
+
+unsigned int SuffixArray::getSize() {
+  return SA.size();
+}
+
+// End of file
+
+/*
+void SuffixArray::constructTotalRadixSA(uint8_t min_suffix) {
+
+  // local suffix arrays
+  vector<Suffix_t> healthy_SA;
+  vector<Suffix_t> tumour_SA;
+
+  // buill local suffix arrays in parallel
+
+  vector<thread> tissue_SA_threads;
+
+  // thread for healthy 
+  tissue_SA_threads.push_back(
+      std::thread(&SuffixArray::generalizedRadixSA, this,
+                  &healthy_SA, 
+                  HEALTHY, min_suffix)
+      );
+ 
+  // thread for tumour
+  tissue_SA_threads.push_back(
+      std::thread(&SuffixArray::generalizedRadixSA, this,
+        &tumour_SA, 
+        TUMOUR, min_suffix)
+      );
+
+  // wait for threads to finish
+  for(auto &thread : tissue_SA_threads) {
+    thread.join();
+  }
+
+
+
+  SA.reserve(healthy_SA.size() + tumour_SA.size()); // make room
+
+  bool end_of_healthy = false;
+  bool end_of_tumour = false; // not for long...lets hope ;)
+
+  unsigned int tind=0, hind=0;
+
+  cout << "Merging tissue general suffix arrays to build final suffix " << 
+    "array " << endl;
+
+
+  while ((tind < tumour_SA.size()) || (hind < healthy_SA.size())) {
+
+    // bound checks...
+    if(hind == healthy_SA.size()) {
+      end_of_healthy = true;
+    }
+
+    if(tind == tumour_SA.size()) {
+      end_of_tumour = true;
+    }
+
+
+    // one has reached end, so add all of other
+    if(end_of_healthy) {
+      SA.push_back(tumour_SA[tind]);
+      tind++;
+    }
+
+    else if(end_of_tumour) {
+      SA.push_back(healthy_SA[hind]);
+      hind++;
+    }
+
+    else {  // noone reached end so add based on lex order
+      string::iterator h_start, h_end, t_start, t_end;
+
+      t_start = reads->returnStartIterator(tumour_SA[tind]);
+      t_end   = reads->returnEndIterator(tumour_SA[tind]);
+
+      h_start = reads->returnStartIterator(healthy_SA[hind]);
+      h_end   = reads->returnEndIterator(healthy_SA[hind]);
+
+
+      if(lexicographical_compare(t_start, t_end, h_start, h_end)) {
+        SA.push_back(tumour_SA[tind]);
+        tind++;
+      }
+      else {
+        SA.push_back(healthy_SA[hind]);
+        hind++;
+      }
+
+    }
+
+  }
+
+  cout << "Done with suffix array build" << endl;
+
+}
+
 // ---------------- NAIVE MERGESORT FUNCS ----------------------------
+
 
 void SuffixArray::sort(unsigned int from, unsigned int to, unsigned int level) {
   if ((to - from) <= 1) {return;} // dividing reaches single elem, hit base case
@@ -468,7 +552,6 @@ void SuffixArray::sort(unsigned int from, unsigned int to, unsigned int level) {
   //MTIME(level_name);
   //MPRINT(level_name);
 }
-
 
 void SuffixArray::merge(unsigned int from, unsigned int mid, unsigned int to) {
   // make out of place copies of sa section 
@@ -560,14 +643,6 @@ void SuffixArray::lexMergeSort() {
    sort(0, SA.size(), 0);      // start recursive mergesort
 }
 
-
-
-// PUBLIC HELPER FUNCTIONS
-
-
-
-
-
 void SuffixArray::loadUnsortedSuffixes(uint8_t min_suffix) {
 
     // Read length is ~100 bp, and stoping at 100 - min_suffix
@@ -592,7 +667,6 @@ void SuffixArray::loadUnsortedSuffixes(uint8_t min_suffix) {
       SA.push_back(suf);
     }
   }
-
   for(unsigned int read_id = 0; read_id < reads->getSize(TUMOUR); read_id++){
 
     for(uint16_t offset = 0; 
@@ -614,76 +688,4 @@ void SuffixArray::loadUnsortedSuffixes(uint8_t min_suffix) {
   // compact as possible 
   SA.shrink_to_fit();
 }
-
-void SuffixArray::buildGSAFile(vector<Suffix_t> &GSA, string filename) {
-  if (filename.substr(filename.size() - EXT.size()) != EXT){
-    filename += EXT;
-  }
-  ofstream gsa_file;
-  gsa_file.open(filename);
-
-  for(int i = 0; i < GSA.size(); i++) {
-    string next_suf = "";
-    next_suf += (to_string(GSA[i].read_id) + ",");
-    next_suf += (to_string(GSA[i].offset)  + ",");
-    next_suf += to_string(GSA[i].type);
-    gsa_file << next_suf << endl;
-  }
-}
-
-void SuffixArray::constructGSAFromFile(vector<Suffix_t> &GSA, string filename) {
-  ifstream gsa_file;
-  gsa_file.open(filename);
-  string next_line;
-
-  while (getline(gsa_file, next_line)) {
-    vector<string> elements;
-    split_string(next_line, ",", elements); // split.gsa line into suffix fields
-    Suffix_t suf;
-
-    if (elements.size() == NUM_FIELDS) {
-      suf.read_id = stoi(elements[READ_ID_IDX]);    // load data
-      suf.offset = stoi(elements[OFFSET_IDX]);
-      suf.type = stoi(elements[TYPE_IDX]);
-      GSA.push_back(suf);
-    }
-  }
-}
-
-
-void SuffixArray::printSuffixData() {
-  for(Suffix_t s : SA) {
-    cout << "read_id: " << s.read_id <<  " --- " 
-         << "offset: "  << s.offset  <<  " --- "
-         << std::boolalpha 
-         << "tissue: " << ((s.type) ? "HEALTHY" : "TUMOUR") 
-         << endl;
-  }
-}
-
-void SuffixArray::printSuffixArray(std::string const& filename) {
-  ofstream file(filename);
-  for (Suffix_t & s : SA) {
-    file << reads->returnSuffix(s) << endl;
-  }
-  file.close();
-}
-void SuffixArray::printSuffixes() {
-  for(Suffix_t s : SA) {
-    cout << reads->returnSuffix(s) << endl;
-  }
-}
-
-Suffix_t & SuffixArray::getElem(int index) {
-  if (index >= SA.size() || index < 0) {
-    cout << "getElem() out of bounds" << endl;
-    exit(1);
-  }
-  return SA[index];
-}
-
-unsigned int SuffixArray::getSize() {
-  return SA.size();
-}
-
-// End of file
+ */
