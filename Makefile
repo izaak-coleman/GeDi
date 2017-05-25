@@ -1,4 +1,4 @@
-OBJ=main.o util_funcs.o SuffixArray.o BreakPointBlocks.o Reads.o GenomeMapper.o SamEntry.o
+OBJ=main.o util_funcs.o SuffixArray.o SNVIdentifier.o Reads.o GenomeMapper.o SamEntry.o
 EXE=GeDi
 CXX=g++
 COMPFLAGS=-Wall -ggdb -MMD -pthread -std=c++11

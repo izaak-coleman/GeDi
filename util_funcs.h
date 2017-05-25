@@ -28,7 +28,6 @@ struct consensus_pair {
   std::string non_mutated;
   std::string mqual;
   std::string nqual;
-  unsigned int pair_id;
   int mut_offset;
   int nmut_offset;
   int left_ohang;
