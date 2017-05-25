@@ -5,7 +5,7 @@
 #include <vector>
 #include <fstream>
 
-#include "BranchPointGroups.h"
+#include "BreakPointBlocks.h"
 #include "Reads.h"
 #include "SamEntry.h"
 
@@ -34,7 +34,7 @@ class GenomeMapper {
 private:
   const int MIN_MAPQ;
   const std::string CHR;
-  BranchPointGroups *BPG; 
+  BreakPointBlocks *BPB; 
   ReadPhredContainer *reads;
 
   void identifySNVs(std::vector<SamEntry> &alignments);
@@ -51,7 +51,7 @@ private:
 
 
 public:
-    GenomeMapper(BranchPointGroups &bpgroups, ReadPhredContainer &reads,
+    GenomeMapper(BreakPointBlocks &bpb, ReadPhredContainer &reads,
                  std::string outpath, std::string const& basename,
                  std::string const& chr, std::string const& bwt_idx,
                  int min_mapq);

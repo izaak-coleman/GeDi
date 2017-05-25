@@ -8,7 +8,7 @@
 #include <boost/regex.hpp>
 
 #include "GenomeMapper.h"
-#include "BranchPointGroups.h"
+#include "BreakPointBlocks.h"
 #include "Reads.h"
 #include "util_funcs.h"
 #include "SamEntry.h"
@@ -19,7 +19,7 @@ using namespace std;
 static const int REVERSE_FLAG = 16;
 static const int FORWARD_FLAG = 0;
 
-GenomeMapper::GenomeMapper(BranchPointGroups &bpgroups, 
+GenomeMapper::GenomeMapper(BreakPointBlocks &bpb, 
                            ReadPhredContainer &reads,
                            string outpath,
                            string const& basename,
@@ -29,7 +29,7 @@ GenomeMapper::GenomeMapper(BranchPointGroups &bpgroups,
                            MIN_MAPQ(min_mapq),
                            CHR(chr) {
   this->reads = &reads;
-  this->BPG = &bpgroups;
+  this->BPB = &bpb;
   if (outpath[outpath.size()-1] != '/') outpath += "/";
   string fastqName(outpath + basename + ".fastq"),
          samName(outpath + basename + ".sam"),
@@ -52,8 +52,8 @@ GenomeMapper::GenomeMapper(BranchPointGroups &bpgroups,
 void GenomeMapper::constructSNVFastqData(string const& fastqName) {
   ofstream snv_fq;
   snv_fq.open(fastqName.c_str());
-  for (int i = 0; i < BPG->cnsPairSize(); i++) {
-    consensus_pair &cns_pair = BPG->getPair(i);
+  for (int i = 0; i < BPB->cnsPairSize(); i++) {
+    consensus_pair &cns_pair = BPB->getPair(i);
     string qual(cns_pair.non_mutated.size(), '!'); 
     snv_fq << "@" + cns_pair.mutated + "[" + to_string(cns_pair.left_ohang) + 
               ";" + to_string(cns_pair.right_ohang) + ";" + 
@@ -185,15 +185,15 @@ void GenomeMapper::buildConsensusPairs() {
   // generate consensus pair for each breakpoint block
   // and then add starting gaps to align sequence pair
 
-  consensus_pairs.reserve(BPG->getSize()); // make room
+  consensus_pairs.reserve(BPB->getSize()); // make room
   int continued{0};
-  for (int i=0; i < BPG->getSize(); ++i) {
+  for (int i=0; i < BPB->getSize(); ++i) {
     consensus_pair pair;
     pair.left_ohang = pair.right_ohang = 0;   // default to no overhang
 
     bool skip_mutated{false}, skip_non_mutated{false};
-    skip_mutated = BPG->generateConsensusSequence(i, pair.mut_offset, TUMOUR, pair.pair_id, pair.mutated, pair.mqual);
-    skip_non_mutated = BPG->generateConsensusSequence(i, pair.nmut_offset, HEALTHY, pair.pair_id, pair.non_mutated, pair.nqual);
+    skip_mutated = BPB->generateConsensusSequence(i, pair.mut_offset, TUMOUR, pair.pair_id, pair.mutated, pair.mqual);
+    skip_non_mutated = BPB->generateConsensusSequence(i, pair.nmut_offset, HEALTHY, pair.pair_id, pair.non_mutated, pair.nqual);
 
     // discard sequences that do not contain both a non-mutated
     // and mutated cns pair
@@ -237,18 +237,18 @@ void GenomeMapper::maskLowQualityPositions(consensus_pair & pair, bool &low_qual
 //  // generate consensus pair for each breakpoint block
 //  // and then add starting gaps to align sequence pair
 //
-//  consensus_pairs.reserve(BPG->getSize()); // make room
+//  consensus_pairs.reserve(BPB->getSize()); // make room
 //  int continued{0};
-//  for (int i=0; i < BPG->getSize(); ++i) {
+//  for (int i=0; i < BPB->getSize(); ++i) {
 //
 //    vector< vector<int> > tumour_base_frequency, healthy_base_frequency;
 //    consensus_pair pair;
 //    pair.left_ohang = pair.right_ohang = 0;   // default to no overhang
 //
-//    pair.mutated = BPG->generateConsensusSequence(i,
+//    pair.mutated = BPB->generateConsensusSequence(i,
 //      pair.mut_offset, TUMOUR, pair.pair_id, tumour_base_frequency);
 //
-//    pair.non_mutated = BPG->generateConsensusSequence(i,
+//    pair.non_mutated = BPB->generateConsensusSequence(i,
 //        pair.nmut_offset, HEALTHY, pair.pair_id, healthy_base_frequency);
 //
 //    // discard sequences that do not contain both a non-mutated

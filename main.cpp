@@ -13,7 +13,7 @@
 #include <typeinfo>
 
 #include "SuffixArray.h"
-#include "BranchPointGroups.h"
+#include "BreakPointBlocks.h"
 #include "util_funcs.h"
 #include "Reads.h"
 #include "GenomeMapper.h"
@@ -238,7 +238,7 @@ int main(int argc, char** argv)
 
     SuffixArray SA(reads, reads.getMinSuffixSize(), vm["n_threads"].as<int>());
 
-    BranchPointGroups BG(SA, reads, 
+    BreakPointBlocks BPB(SA, reads, 
                          vm["min_phred"].as<int>()+BASE33_CONVERSION,
                          vm["gsa1_mct"].as<int>(),
                          vm["gsa2_mct"].as<int>(),
@@ -248,7 +248,7 @@ int main(int argc, char** argv)
                          vm["expected_contamination"].as<double>(),
                          vm["max_allele_freq_of_error"].as<double>());
 
-    GenomeMapper mapper(BG, reads,
+    GenomeMapper mapper(BPB, reads,
                         vm["output_path"].as<string>(),
                         vm["output_basename"].as<string>(),
                         vm["chromosome"].as<string>(),
