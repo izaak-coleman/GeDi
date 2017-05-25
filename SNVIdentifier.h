@@ -101,6 +101,9 @@ private:
 
   bool excessLowQuality(consensus_pair & pair);
 
+  bool groupSuffixes(int direction, int seedIndex, bpBlock &block, 
+      bool orienation, int calibration);
+
   bool getSuffixesFromLeft(int seed_index, 
                            bpBlock &block,
                            bool orientation, int calibration);
@@ -114,9 +117,9 @@ private:
   bool extendBlock(int seed_index, bpBlock 
       &block, bool orientation, int calibration);
 
-  bool lexCompare(std::string l, std::string r, unsigned int min_lr);
+  bool lexCompare(std::string const& l, std::string const& r, unsigned int min_lr);
 
-  int lcp(std::string l, std::string r, unsigned int mlr);
+  int lcp(std::string const& l, std::string const& r, unsigned int mlr);
 
   int minVal(int a, int b);
 
@@ -170,8 +173,8 @@ public:
   consensus_pair & getPair(int i);
 
   int cnsPairSize();
-};
 
+};
 
 
 

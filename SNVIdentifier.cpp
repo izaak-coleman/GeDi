@@ -133,8 +133,6 @@ void SNVIdentifier::trimCancerConsensus(consensus_pair & pair) {
   else if (pair.mut_offset < pair.nmut_offset) {
     pair.left_ohang = pair.nmut_offset - pair.mut_offset;
   }
-
-  // right cleave
   if (pair.mutated.size() > (pair.non_mutated.size() - pair.left_ohang)) {
     int dist = pair.mutated.size() - (pair.non_mutated.size() - pair.left_ohang);
     pair.mutated.erase(pair.mutated.size() - dist, dist);
@@ -212,7 +210,6 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
       subBlock.push_back(tag);
     }
   }
-
   int max_offset = 0;
   int min_offset = std::numeric_limits<int>::max();
   for (read_tag &tag : subBlock) {
@@ -226,18 +223,14 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
       min_offset = tag.offset;
     }
   }
-  // value did not change and will cause std::bad_alloc, so set to 0
   if(min_offset == std::numeric_limits<int>::max()) {
     min_offset = 0;
   }
-
   vector<vector<int> > 
   cnsCount(4, vector<int>(max_offset + reads->maxLengthRead() - min_offset, 0));
   for (read_tag const & tag : subBlock) {
     string read = reads->getReadByIndex(tag.read_id, tag.tissue_type);
     string phred = reads->getPhredString(tag.read_id, tag.tissue_type);
-
-    // calibrate for orientation
     if(tag.orientation == LEFT) {
       read = reverseComplementString(read);
       std::reverse(phred.begin(), phred.end());
@@ -245,7 +238,6 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
     else {
       read.pop_back();    // remove dollar symbol
     }
-
     for(int i=0; i < read.size(); i++) {
       // only allow high quality bases to contribute to consensus
       if (phred[i] >= MIN_PHRED_QUAL) {
@@ -262,11 +254,8 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
       }
     }
   }
-
   for (int pos=0; pos < cnsCount[0].size(); pos++) {
     int maxVal = 0, maxInd = 0;
-
-    // find highest freq. base
     for(int base=0; base < 4; base++) {
       if (cnsCount[base][pos] > maxVal) {
         maxVal = cnsCount[base][pos];
@@ -274,28 +263,18 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
       }
     }
     switch(maxInd) {
-      case 0:
-        cns += "A"; break;
-      case 1:
-        cns += "T"; break;
-      case 2:
-        cns += "C"; break;
-      case 3:
-        cns += "G"; break;
+      case 0: cns += "A"; break;
+      case 1: cns += "T"; break;
+      case 2: cns += "C"; break;
+      case 3: cns += "G"; break;
     }
   }
-  if (cns.empty()) {
-    /// return something;
-  }
   cns_offset = max_offset;
-
   string q_str(cnsCount[0].size(), '-');
   for (int pos=0; pos < cnsCount[0].size(); pos++) {
     // mask all positions with reads less than >= GSA2_MCT
     int nreads=0;
-    for (int base=0; base < 4; base++) {
-      nreads += cnsCount[base][pos];
-    }
+    for (int base=0; base < 4; base++) nreads += cnsCount[base][pos];
     if (nreads < GSA2_MCT) {
       if (tissue == TUMOUR) {
         q_str[pos] = 'X';
@@ -306,17 +285,13 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
     }
   }
   buildQualityString(q_str, cnsCount, cns, tissue);
-  qual = q_str;
+  qual = std::move(q_str);
 }
 
 
 void SNVIdentifier::buildQualityString(string & qual, vector< vector<int> > const& freq_matrix,
     string const& cns, bool tissue) {
   for (int pos=0; pos < cns.size(); pos++) {
-
-    // Unique masking logic to cancer reads
-    // The supporting evidence for the chosen consensus
-    // position must be above 4
     if (tissue == TUMOUR && qual[pos] == '-') { // do not override 'X'
       int base{0};
       switch (cns[pos]) {
@@ -330,16 +305,8 @@ void SNVIdentifier::buildQualityString(string & qual, vector< vector<int> > cons
         continue;
       }
     }
-
-    // Determine the number of bases above the error frequency
-    // by the calulation:
-    //      bases / total bases = freq.
-    // bases is equivalent to the number of reads with a base of type given
-    // base. 
     double total_bases = 0;
-    for (int base = 0; base < 4; base++) {
-      total_bases += freq_matrix[base][pos];
-    }
+    for (int base = 0; base < 4; base++) total_bases += freq_matrix[base][pos];
     int n_bases_above_err_freq{0};
     for(int base = 0; base < 4; base++) {
       if((freq_matrix[base][pos] / total_bases) > ALLELIC_FREQ_OF_ERROR) {
@@ -437,7 +404,6 @@ void SNVIdentifier::extractionWorker(unsigned int seed_index, unsigned int to) {
 }
 
 
-
 void SNVIdentifier::seedBreakPointBlocks() {
   string concat("");
   vector<pair<unsigned int, unsigned int>> bsa;
@@ -527,7 +493,7 @@ string SNVIdentifier::readTagToString(read_tag const& tag) {
   if (tag.orientation == LEFT) {
     offset = read.size() - (tag.offset + reads->getMinSuffixSize() + 1);
     read = reverseComplementString(read);
-    dollar = "$";
+    dollar = TERM;
   }
   return read.substr(offset) + dollar;
 }
@@ -552,16 +518,10 @@ void SNVIdentifier::extractGroups(vector<read_tag> const& gsa) {
       &gsa)
     );
     from = to;
-    if (i == N_THREADS - 2) {
-      to = gsa.size();
-    }
-    else {
-      to += elementsPerThread;
-    }
+    if (i == N_THREADS - 2) to = gsa.size();
+    else to += elementsPerThread;
   }
-  for (auto &t : workers) {
-    t.join();
-  }
+  for (auto &t : workers) t.join();
 }
 void SNVIdentifier::extractGroupsWorker(unsigned int seedIndex,
                                             unsigned int to,
@@ -602,45 +562,61 @@ void SNVIdentifier::extractGroupsWorker(unsigned int seedIndex,
 }
 
 string SNVIdentifier::addGaps(int n_gaps) {
-  string gaps = "";
-  for(int i=0; i < n_gaps; i++) {
-    gaps += "-";
-  }
+  string gaps(n_gaps, '-');
   return gaps;
 }
-
-
 
 bool SNVIdentifier::extendBlock(int seed_index, 
     bpBlock &block, bool orientation, int calibration) {
   // seed_index is the index of the unique suffix_t this function
   // was called with. 
   bool success_left{false}, success_right{false};
-
   int left_of_seed = 0, right_of_seed = 0;
 
   if (seed_index != 0){
     left_of_seed = ::computeLCP(SA->getElem(seed_index),
                      SA->getElem(seed_index-1), *reads);
   }
-
   if(seed_index != SA->getSize()-1) {
     right_of_seed = ::computeLCP(SA->getElem(seed_index), 
                      SA->getElem(seed_index+1), *reads);
   }
-
-
   if (left_of_seed >= 30 && seed_index > 0){
     success_left = getSuffixesFromLeft(seed_index, block, orientation, calibration);
+    // success_left = groupSuffixes(1, seed_index, block, orientation,
+    // calibration);
   }
-  
   if (right_of_seed >= 30 && seed_index < (SA->getSize() - 1)) {
     success_right = getSuffixesFromRight(seed_index, block, orientation, calibration);
+    //success_right = groupSuffixecs(-1, seed_index, block, orientation,
+    //calibration);
   }
-  // seed_index is the index of the unique suffix_t this function
   return success_left || success_right;
 }
 
+bool SNVIdentifier::groupSuffixes(int direction, int seedIndex, bpBlock &block,
+    bool orientation, int calibration) {
+  bool success{false};
+  int arrow{seedIndex + direction};
+  while (arrow >= 0 && arrow < SA->getSize() && 
+         ::computeLCP(SA->getElem(arrow), SA->getElem(seedIndex), *reads) >=
+           reads->getMinSuffixSize()) {
+    read_tag nextRead;
+    nextRead.read_id = SA->getElem(arrow).read_id;
+    nextRead.orientation = orientation;
+    nextRead.offset = SA->getElem(arrow).offset;
+    if (orientation == RIGHT) nextRead.offset += calibration;
+    else nextRead.offset -= calibration;
+
+    if(SA->getElem(arrow).type == HEALTHY) nextRead.tissue_type = HEALTHY;
+    else nextRead.tissue_type = SWITCHED;
+
+    pair<bpBlock::iterator, bool> insertion = block.insert(nextRead);
+    if (insertion.second == true) success = true;
+    arrow += direction;
+  }
+  return success;
+}
 bool SNVIdentifier::getSuffixesFromLeft(int seed_index,
   bpBlock &block, bool orientation, int calibration) {
 
@@ -729,28 +705,24 @@ int SNVIdentifier::minVal(int a, int b) {
   return (a > b) ? b : a;
 }
 
-bool SNVIdentifier::lexCompare(string l, string r, unsigned int min_lr) {
+bool SNVIdentifier::lexCompare(string const& l, string const& r, unsigned int min_lr) {
   // return true if l < r
+  // min_lr avoids redundant searches 
 
-  // Generate pointers to lhs and rhs suffixes in reads
-
-  // * min_lr avoids redundant searches droping bound to, in practice
-  // O(n + log m)
-
-  string::iterator l_iter  = l.begin() + min_lr;    
-  string::iterator l_end   = l.end();
-  string::iterator r_iter  = r.begin() + min_lr;
-  string::iterator r_end   = r.end();
+  string::const_iterator l_iter  = l.begin() + min_lr;    
+  string::const_iterator l_end   = l.end();
+  string::const_iterator r_iter  = r.begin() + min_lr;
+  string::const_iterator r_end   = r.end();
 
   for( ; (l_iter != l_end && r_iter != r_end); l_iter++, r_iter++){
     // lex compare character
-    if (*l_iter < *r_iter) { return true; }
-    if (*r_iter < *l_iter) { return false; }
+    if (*l_iter < *r_iter) return true;
+    if (*r_iter < *l_iter) return false;
     // equiv char so move to next...
-    }
+  }
 
-    // One is prefix of other, return the prefix as higher suffix
-    return (l_iter == l_end) && (r_iter != r_end);
+  // One is prefix of other, return the prefix as higher suffix
+  return (l_iter == l_end) && (r_iter != r_end);
 }
 
 long long int SNVIdentifier::binarySearch(string query) {
@@ -805,7 +777,7 @@ long long int SNVIdentifier::binarySearch(string query) {
   return -1; // no match
 }
 
-int SNVIdentifier::lcp(string l, string r, unsigned int mlr) {
+int SNVIdentifier::lcp(string const& l, string const& r, unsigned int mlr) {
   while (mlr < l.length() && mlr < r.length() && l[mlr] == r[mlr]) {
     mlr++;
   }
@@ -857,20 +829,6 @@ void SNVIdentifier::mergeBlocks(bpBlock & to, bpBlock & from) {
   int adjustment = common_read_offset - f_it_offset;
   cout << adjustment << endl;
 
-  //for (bpBlock::iterator it = from.block.begin();
-  //    it != from.block.end();
-  //    it++) {
-  //  // convert to comparable orientation
-  //  int offset;
-  //  if (it->orientation == LEFT) {
-  //    it->offset = convertOffset(*it); // RIGHT->LEFT
-  //    it->offset += adjustment;
-  //    it->offset = convertOffset(*it); // LEFT->RIGHT
-  //  } else {
-  //    it->offset += adjustment;
-  //  }
-  //  to.insert(*it);
-  //}
   for (bpBlock::iterator it = from.begin();
        it != from.end();
        it++) {
@@ -980,10 +938,6 @@ consensus_pair & SNVIdentifier::getPair(int i) {
 int SNVIdentifier::cnsPairSize() {
   return consensus_pairs.size();
 }
-
-
-
-
 
 // end of file
 /*
