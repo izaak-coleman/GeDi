@@ -24,6 +24,8 @@
 #include "benchmark.h"
 using namespace std;
 
+static const string TERM = "$";
+
 SNVIdentifier::SNVIdentifier(SuffixArray &_SA, 
                                      ReadPhredContainer &_reads,
                                      char mpq, int g1, int g2, int cut,
@@ -355,35 +357,22 @@ void SNVIdentifier::buildQualityString(string & qual, vector< vector<int> > cons
   }
 }
 
-
-
 void SNVIdentifier::extractCancerSpecificReads() {
-  unsigned int elements_per_thread = (SA->getSize()  / N_THREADS);
-  vector<thread> workers;
-  unsigned int from=0, to= elements_per_thread;
+  unsigned int elementsPerThread = (SA->getSize()  / N_THREADS);
+  vector<thread> w;
+  unsigned int from = 0, to = elementsPerThread;
   for(int i=0; i < N_THREADS; i++) {
-    workers.push_back(
-      std::thread(&SNVIdentifier::extractionWorker, 
-        this, from, to)
+    w.push_back(
+      std::thread(&SNVIdentifier::extractionWorker, this, from, to)
     );
     from = to;
-    if(i == N_THREADS - 2) {
-      to = SA->getSize();
-    }
-    else {
-      to += elements_per_thread;
-    }
+    if(i == N_THREADS - 2) to = SA->getSize();
+    else to += elementsPerThread;
   }
-  for(auto &thread : workers) {
-      thread.join();
-  }
+  for(auto &t: w) t.join();
 }
 
-
 unsigned int SNVIdentifier::backUpSearchStart(unsigned int seedIndex) {
-  // Thread work division could split a group in half. It is possible
-  // that the split could result in a non-mutated region looking as
-  // if it only contains cancer reads. 
   if (seedIndex == 0) {
     return seedIndex;
   }
@@ -440,7 +429,6 @@ void SNVIdentifier::extractionWorker(unsigned int seed_index, unsigned int to) {
       threadExtr.insert(SA->getElem(seed_index).read_id);
     }
   }
-
   // Load to CancerExtraction, avoiding thread interference
   std::lock_guard<std::mutex> lock(cancer_extraction_lock);
   for(unsigned int extracted_cancer_read : threadExtr) {
@@ -451,30 +439,23 @@ void SNVIdentifier::extractionWorker(unsigned int seed_index, unsigned int to) {
 
 
 void SNVIdentifier::seedBreakPointBlocks() {
-
   string concat("");
-  vector<pair<unsigned int, unsigned int>> binary_search_array;
-
-  // load the first element
+  vector<pair<unsigned int, unsigned int>> bsa;
   set<unsigned int>::iterator it = CancerExtraction.begin();
-  pair<unsigned int, unsigned int> first_read(*it,0);
-  binary_search_array.push_back(first_read);    // first read starts at zero
+  bsa.push_back(pair<unsigned int, unsigned int>(*it,0));
   concat += reads->getReadByIndex(*it, TUMOUR);
-  concat += reverseComplementString( 
-      reads->getReadByIndex(*it, TUMOUR)
-  ) + "$";
+  concat += reverseComplementString(reads->getReadByIndex(*it, TUMOUR));
+  concat += TERM;
 
   cout << "Cancer Extraction size: " <<  CancerExtraction.size() << endl;
   unsigned int concat_idx = 0;
   it++;
   for (; it != CancerExtraction.end(); it++) {
-    // build concat
     concat += reads->getReadByIndex(*it, TUMOUR);
-    concat += reverseComplementString(reads->getReadByIndex(*it, TUMOUR)) + "$";
-    // add bsa values
+    concat += reverseComplementString(reads->getReadByIndex(*it, TUMOUR));
+    concat += TERM;
     concat_idx += reads->getReadByIndex(*std::prev(it), TUMOUR).size() * 2;
-    pair<unsigned int, unsigned int> read_concat_pair (*it, concat_idx);
-    binary_search_array.push_back(read_concat_pair);
+    bsa.push_back(pair<unsigned int, unsigned int>(*it, concat_idx));
   }
 
   // Build SA
@@ -482,37 +463,31 @@ void SNVIdentifier::seedBreakPointBlocks() {
   unsigned long long *radixSA = 
     Radix<unsigned long long>((uchar*) concat.c_str(), concat.size()).build();
   cout << "Size of cancer specific sa: " << concat.size() << endl;
-
-
   cout << "Transforming to cancer specfic gsa" << endl;
-
   vector<thread> workers;
   vector< vector<read_tag> > arrayBlocks(N_THREADS, vector<read_tag>());
   unsigned int elementsPerThread = concat.size() / N_THREADS;
   unsigned int from{0};
   unsigned int to{elementsPerThread};
-
   for (unsigned int i=0; i < N_THREADS; i++) {
     workers.push_back(
         std::thread(&SNVIdentifier::transformBlock, this, 
                     (radixSA + from), (radixSA + to),
-                    &binary_search_array, &arrayBlocks[i])
+                    &bsa, &arrayBlocks[i])
     );
     from = to;
-    if (i == N_THREADS - 2) { 
-      to = concat.size();
-    } else {
-      to += elementsPerThread;
-    }
+    if (i == N_THREADS - 2) to = concat.size();
+    else to += elementsPerThread;
   }
-  for (auto &t: workers) {
-    t.join();
-  }
+  for (auto &t: workers) t.join();
   delete radixSA;
   vector<read_tag> gsa;
-  for (int i=0; i < arrayBlocks.size(); i++) {
-    gsa.insert(gsa.end(), arrayBlocks[i].begin(), arrayBlocks[i].end());
-    arrayBlocks[i].clear();
+  int gsaSz = 0;
+  for (vector<read_tag> const& b : arrayBlocks) gsaSz += b.size();
+  gsa.reserve(gsaSz);
+  for (vector<read_tag> & b : arrayBlocks) {
+    gsa.insert(gsa.end(), b.begin(), b.end());
+    b.clear();
   }
   gsa.shrink_to_fit();
   cout << "GSA2 size: " << gsa.size()<< endl;
