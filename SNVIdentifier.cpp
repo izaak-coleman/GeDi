@@ -259,13 +259,13 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
       if ((*phred)[i] >= MIN_PHRED_QUAL) {
         switch((*read)[i]) {
           case 'A':
-            cnsCount[(max_offset - tag.offset) + i*4    ]++; break;
+            cnsCount[(max_offset - tag.offset + i)*4    ]++; break;
           case 'T':
-            cnsCount[(max_offset - tag.offset) + i*4 + 1]++; break;
+            cnsCount[(max_offset - tag.offset + i)*4 + 1]++; break;
           case 'C':
-            cnsCount[(max_offset - tag.offset) + i*4 + 2]++; break;
+            cnsCount[(max_offset - tag.offset + i)*4 + 2]++; break;
           case 'G':
-            cnsCount[(max_offset - tag.offset) + i*4 + 3]++; break;
+            cnsCount[(max_offset - tag.offset + i)*4 + 3]++; break;
         }
       }
     }
