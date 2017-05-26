@@ -10,7 +10,7 @@
 using namespace std;
 
 
-// COMPULSORY SAM FIELDS
+// //COMPULSORY SAM FIELDS
 const int SamEntry::HDR   = 0;
 const int SamEntry::FLAG  = 1;
 const int SamEntry::RNAME = 2;
@@ -46,7 +46,7 @@ const int SamEntry::RIGHT_OHANG = 27;
 const int SamEntry::BLOCK_ID = 28;
 
 SamEntry::SamEntry(string const& entry) {
-START(SamEntry_SamEntry);
+//START(SamEntry_SamEntry);
   vector<string> split_result;
   split_string(entry, "\t", split_result);
 
@@ -101,16 +101,16 @@ try {
   catch(...) {
     cout << "Exception!!" << endl;
   }
-COMP(SamEntry_SamEntry);
+//COMP(SamEntry_SamEntry);
 }
 
 string SamEntry::startsWith(string const& tok, vector<string> const& fields) {
-START(SamEntry_startsWith);
+//START(SamEntry_startsWith);
   for (string const& s : fields) {
     if (tok == s.substr(0, 2)) return s;
   }
   return "\0";
-COMP(SamEntry_startsWith);
+//COMP(SamEntry_startsWith);
 }
 
 void SamEntry::snv_push_back(int v) {

@@ -24,17 +24,17 @@ using namespace std;
 
 SuffixArray::SuffixArray(ReadPhredContainer &reads, int m, int n):
 N_THREADS(n), MIN_SUFFIX(m) {
-START(SuffixArray_SuffixArray);
+//START(SuffixArray_SuffixArray);
   cout << "MIN SUFFIX " <<  MIN_SUFFIX << endl;
   this->reads = &reads;
   cout << "Starting parallelGenRadixSA:" << endl;
   parallelGenRadixSA(MIN_SUFFIX);
   cout << "GSA1 size: " << SA.size() << endl;
-COMP(SuffixArray_SuffixArray);
+//COMP(SuffixArray_SuffixArray);
 }
 
 void SuffixArray::parallelGenRadixSA(int min_suffix) {
-START(SuffixArray_parallelGenRadixSA);
+//START(SuffixArray_parallelGenRadixSA);
   vector<thread> BSA_and_SA;
   unsigned long long *radixSA;   // Pointer to suffix array
   unsigned int startOfTumour;    // Index of tumour reads in concat
@@ -83,7 +83,7 @@ START(SuffixArray_parallelGenRadixSA);
     b.clear();
   }
   SA.shrink_to_fit();
-COMP(SuffixArray_parallelGenRadixSA);
+//COMP(SuffixArray_parallelGenRadixSA);
 }
 
 void SuffixArray::transformSuffixArrayBlock(vector<Suffix_t> *block, 
@@ -91,7 +91,7 @@ void SuffixArray::transformSuffixArrayBlock(vector<Suffix_t> *block,
     vector<pair<unsigned int, unsigned int> > *tumourBSA,
     unsigned long long *radixSA, unsigned int from, 
     unsigned int to, unsigned int startOfTumour, int min_suf) {
-START(SuffixArray_transformSuffixArrayBlock);
+//START(SuffixArray_transformSuffixArrayBlock);
   for(unsigned int i=from; i < to; i++) {
     // extract mapping, determining which read the suffix belongs to
     Suffix_t s;
@@ -113,7 +113,7 @@ START(SuffixArray_transformSuffixArrayBlock);
     s.read_id = rcPair.first;
     block->push_back(s);
   }
-COMP(SuffixArray_transformSuffixArrayBlock);
+//COMP(SuffixArray_transformSuffixArrayBlock);
 }
 
 void SuffixArray::buildBinarySearchArrays(
@@ -125,7 +125,7 @@ void SuffixArray::buildBinarySearchArrays(
 
 void SuffixArray::generateBSA(
      vector<pair<unsigned int, unsigned int>> &BSA, bool type) {
-START(SuffixArray_generateBSA);
+//START(SuffixArray_generateBSA);
   unsigned int indexInConcat {0};
   BSA.reserve(reads->getSize(type));
   BSA.push_back(pair<unsigned int, unsigned int>(0,0));
@@ -133,13 +133,13 @@ START(SuffixArray_generateBSA);
     indexInConcat += reads->getReadByIndex(i-1, type).size();
     BSA.push_back(pair<unsigned int, unsigned int>(i,indexInConcat));
   }
-COMP(SuffixArray_generateBSA);
+//COMP(SuffixArray_generateBSA);
 }
 
 void SuffixArray::generateParallelRadix(unsigned long long **radixSA, 
                                         unsigned int *startOfTumour,
                                         unsigned int *sizeOfRadixSA) {
-START(SuffixArray_generateParallelRadix);
+//START(SuffixArray_generateParallelRadix);
   // concatenate all reads
   string concat = concatenateReads(HEALTHY);
   *startOfTumour = concat.size();            // mark the end of healthy seqs 
@@ -147,13 +147,13 @@ START(SuffixArray_generateParallelRadix);
   *sizeOfRadixSA = concat.size();
   // Build SA
   *radixSA = Radix<unsigned long long>((uchar*) concat.c_str(), concat.size()).build();
-COMP(SuffixArray_generateParallelRadix);
+//COMP(SuffixArray_generateParallelRadix);
 }
 
 pair<unsigned int, unsigned int> 
 SuffixArray::binarySearch(vector<pair<unsigned int, unsigned int> > &BSA, 
                   unsigned int suffixIndex) {
-START(SuffixArray_binarySearch);
+//START(SuffixArray_binarySearch);
   unsigned int right = BSA.size();
   unsigned int left = 0;
   unsigned int mid;
@@ -166,17 +166,17 @@ START(SuffixArray_binarySearch);
   }
   left--;
   return BSA[left]; // left on the tuple
-COMP(SuffixArray_binarySearch);
+//COMP(SuffixArray_binarySearch);
 }
 
 string SuffixArray::concatenateReads(bool type) {
-START(SuffixArray_concatenateReads);
+//START(SuffixArray_concatenateReads);
   string concat = "";
   for(int i=0; i < reads->getSize(type); i++) {
     concat += reads->getReadByIndex(i, type);
   }
   return concat;
-COMP(SuffixArray_concatenateReads);
+//COMP(SuffixArray_concatenateReads);
 }
 
 Suffix_t & SuffixArray::getElem(int index) {
@@ -368,7 +368,7 @@ void SuffixArray::sort(unsigned int from, unsigned int to, unsigned int level) {
   level_name = "level_";
   level_name += s.str();
 
-  //MSTART(SuffixArray_level_name);
+  //M//START(SuffixArray_level_name);
   merge(from, mid, to);
   //MEND(level_name);
   //MTIME(level_name);

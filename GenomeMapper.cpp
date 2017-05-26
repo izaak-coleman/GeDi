@@ -28,7 +28,7 @@ GenomeMapper::GenomeMapper(SNVIdentifier &snv,
                            int min_mapq):
                            MIN_MAPQ(min_mapq),
                            CHR(chr) {
-START(GenomeMapper_GenomeMapper);        
+//START(GenomeMapper_GenomeMapper);        
   this->reads = &reads;
   this->snvId = &snv;
   if (outpath[outpath.size()-1] != '/') outpath += "/";
@@ -39,7 +39,7 @@ START(GenomeMapper_GenomeMapper);
   cout << "Writing fastq" << endl;
   constructSNVFastqData(fastqName);
   cout << "Aligning consensus pairs with Bowtie2" << endl;
-  string command_aln("./bowtie2-2.3.1/bowtie2 -x " + bwt_idx + " -U " +
+  string command_aln("./bowtie2-2.3.1/bowtie2 -p 64 -x " + bwt_idx + " -U " +
                      fastqName + " -S " + samName);
   system(command_aln.c_str());
   vector<SamEntry> alignments;
@@ -48,11 +48,11 @@ START(GenomeMapper_GenomeMapper);
   cout << "Identifying SNV" << endl;
   identifySNVs(alignments);
   outputSNVToUser(alignments, outName);
-COMP(GenomeMapper_GenomeMapper);  
+//COMP(GenomeMapper_GenomeMapper);  
 }
 
 void GenomeMapper::constructSNVFastqData(string const& fastqName) {
-START(GenomeMapper_constructSNVFastqData);
+//START(GenomeMapper_constructSNVFastqData);
   ofstream snv_fq;
   snv_fq.open(fastqName.c_str());
   for (int i = 0; i < snvId->cnsPairSize(); i++) {
@@ -64,11 +64,11 @@ START(GenomeMapper_constructSNVFastqData);
               + "\n+\n" + qual + "\n";
   }
   snv_fq.close();
-COMP(GenomeMapper_constructSNVFastqData);
+//COMP(GenomeMapper_constructSNVFastqData);
 }
 
 void GenomeMapper::parseSamFile(vector<SamEntry> &alignments, string filename) {
-START(GenomeMapper_parseSamFile);
+//START(GenomeMapper_parseSamFile);
   ifstream snvSam(filename);
   boost::regex rgx_header("(@).*");
   string line;
@@ -80,12 +80,12 @@ START(GenomeMapper_parseSamFile);
     alignments.push_back(entry);
   }
   snvSam.close();
-COMP(GenomeMapper_parseSamFile);
+//COMP(GenomeMapper_parseSamFile);
 }
 
 
 void GenomeMapper::identifySNVs(vector<SamEntry> &alignments) {
-START(GenomeMapper_identifySNVs);
+//START(GenomeMapper_identifySNVs);
   for (SamEntry & entry : alignments) {
     if(entry.get<int>(SamEntry::FLAG) == FORWARD_FLAG) {
       countSNVs(entry, entry.get<int>(SamEntry::LEFT_OHANG));
@@ -95,11 +95,11 @@ START(GenomeMapper_identifySNVs);
       countSNVs(entry, entry.get<int>(SamEntry::RIGHT_OHANG)); // invert overhangs due to rev comp
     }
   }
-COMP(GenomeMapper_identifySNVs);
+//COMP(GenomeMapper_identifySNVs);
 }
 
 void GenomeMapper::countSNVs(SamEntry &alignment, int ohang) {
-START(GenomeMapper_countSNVs);
+//START(GenomeMapper_countSNVs);
   string mutated = alignment.get<string>(SamEntry::HDR);
   string nonMutated = alignment.get<string>(SamEntry::SEQ);
   // indel signature
@@ -128,14 +128,14 @@ START(GenomeMapper_countSNVs);
       alignment.snv_push_back(i);
     }
   }
-COMP(GenomeMapper_countSNVs);
+//COMP(GenomeMapper_countSNVs);
 }
 bool GenomeMapper::compareSNVLocations(const single_snv &a, const single_snv &b) {
   return a.position < b.position;
 }
 
 void GenomeMapper::outputSNVToUser(vector<SamEntry> &alignments, string outName) {
-START(GenomeMapper_outputSNVToUser);
+//START(GenomeMapper_outputSNVToUser);
   vector<single_snv> separate_snvs;
   for(SamEntry & entry : alignments) {
     for(int i=0; i < entry.snvLocSize(); i++) {
@@ -173,7 +173,7 @@ START(GenomeMapper_outputSNVToUser);
     i++;
   }
   report.close();
-COMP(GenomeMapper_outputSNVToUser);
+//COMP(GenomeMapper_outputSNVToUser);
 }
 
 

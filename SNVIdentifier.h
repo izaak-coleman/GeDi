@@ -136,8 +136,8 @@ private:
   void extractGroupsWorker(unsigned int seed_index, unsigned int to,
                            std::vector<read_tag> const* gsa_ptr);
 
-  void buildQualityString(std::string & qual, std::vector<std::vector<int> > const&
-      freq_matrix, std::string const& cns, bool tissue);
+  void buildQualityString(std::string & qual, std::vector<int> const&
+      freq_matrix, int width, std::string const& cns, bool tissue);
 
   int computeLCP(read_tag const& a, read_tag const& b);
 
