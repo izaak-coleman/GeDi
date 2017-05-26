@@ -5,6 +5,7 @@
 
 #include "util_funcs.h"
 #include "SamEntry.h"
+#include "benchmark.h"
 
 using namespace std;
 
@@ -45,6 +46,7 @@ const int SamEntry::RIGHT_OHANG = 27;
 const int SamEntry::BLOCK_ID = 28;
 
 SamEntry::SamEntry(string const& entry) {
+START(SamEntry_SamEntry);
   vector<string> split_result;
   split_string(entry, "\t", split_result);
 
@@ -96,16 +98,19 @@ try {
       fields[XE] = startsWith("XE", split_result);
     }
   }
-catch(...) {
-  cout << "Exception!!" << endl;
-}
+  catch(...) {
+    cout << "Exception!!" << endl;
+  }
+COMP(SamEntry_SamEntry);
 }
 
 string SamEntry::startsWith(string const& tok, vector<string> const& fields) {
+START(SamEntry_startsWith);
   for (string const& s : fields) {
     if (tok == s.substr(0, 2)) return s;
   }
   return "\0";
+COMP(SamEntry_startsWith);
 }
 
 void SamEntry::snv_push_back(int v) {

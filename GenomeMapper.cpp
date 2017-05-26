@@ -28,6 +28,7 @@ GenomeMapper::GenomeMapper(SNVIdentifier &snv,
                            int min_mapq):
                            MIN_MAPQ(min_mapq),
                            CHR(chr) {
+START(GenomeMapper_GenomeMapper);        
   this->reads = &reads;
   this->snvId = &snv;
   if (outpath[outpath.size()-1] != '/') outpath += "/";
@@ -47,9 +48,11 @@ GenomeMapper::GenomeMapper(SNVIdentifier &snv,
   cout << "Identifying SNV" << endl;
   identifySNVs(alignments);
   outputSNVToUser(alignments, outName);
+COMP(GenomeMapper_GenomeMapper);  
 }
 
 void GenomeMapper::constructSNVFastqData(string const& fastqName) {
+START(GenomeMapper_constructSNVFastqData);
   ofstream snv_fq;
   snv_fq.open(fastqName.c_str());
   for (int i = 0; i < snvId->cnsPairSize(); i++) {
@@ -61,9 +64,11 @@ void GenomeMapper::constructSNVFastqData(string const& fastqName) {
               + "\n+\n" + qual + "\n";
   }
   snv_fq.close();
+COMP(GenomeMapper_constructSNVFastqData);
 }
 
 void GenomeMapper::parseSamFile(vector<SamEntry> &alignments, string filename) {
+START(GenomeMapper_parseSamFile);
   ifstream snvSam(filename);
   boost::regex rgx_header("(@).*");
   string line;
@@ -75,10 +80,12 @@ void GenomeMapper::parseSamFile(vector<SamEntry> &alignments, string filename) {
     alignments.push_back(entry);
   }
   snvSam.close();
+COMP(GenomeMapper_parseSamFile);
 }
 
 
 void GenomeMapper::identifySNVs(vector<SamEntry> &alignments) {
+START(GenomeMapper_identifySNVs);
   for (SamEntry & entry : alignments) {
     if(entry.get<int>(SamEntry::FLAG) == FORWARD_FLAG) {
       countSNVs(entry, entry.get<int>(SamEntry::LEFT_OHANG));
@@ -88,9 +95,11 @@ void GenomeMapper::identifySNVs(vector<SamEntry> &alignments) {
       countSNVs(entry, entry.get<int>(SamEntry::RIGHT_OHANG)); // invert overhangs due to rev comp
     }
   }
+COMP(GenomeMapper_identifySNVs);
 }
 
 void GenomeMapper::countSNVs(SamEntry &alignment, int ohang) {
+START(GenomeMapper_countSNVs);
   string mutated = alignment.get<string>(SamEntry::HDR);
   string nonMutated = alignment.get<string>(SamEntry::SEQ);
   // indel signature
@@ -119,12 +128,14 @@ void GenomeMapper::countSNVs(SamEntry &alignment, int ohang) {
       alignment.snv_push_back(i);
     }
   }
+COMP(GenomeMapper_countSNVs);
 }
 bool GenomeMapper::compareSNVLocations(const single_snv &a, const single_snv &b) {
   return a.position < b.position;
 }
 
 void GenomeMapper::outputSNVToUser(vector<SamEntry> &alignments, string outName) {
+START(GenomeMapper_outputSNVToUser);
   vector<single_snv> separate_snvs;
   for(SamEntry & entry : alignments) {
     for(int i=0; i < entry.snvLocSize(); i++) {
@@ -162,6 +173,7 @@ void GenomeMapper::outputSNVToUser(vector<SamEntry> &alignments, string outName)
     i++;
   }
   report.close();
+COMP(GenomeMapper_outputSNVToUser);
 }
 
 

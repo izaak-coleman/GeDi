@@ -11,6 +11,7 @@
 #include "kseq.h"
 #include "util_funcs.h"
 #include "Reads.h"
+#include "benchmark.h"
 
 KSEQ_INIT(gzFile, gzread);    // initialize .gz parser
 
@@ -26,6 +27,7 @@ static const          string TUMOUR_DATA  = "T";
 
 ReadPhredContainer::ReadPhredContainer(string const& inputFile):
 MIN_SUFFIX_SIZE(_MIN_SUFFIX_SIZE) {
+START(ReadPhredContainer_ReadPhredContainer);
   vector<file_and_type> datafiles;
   maxLen = 0;
   parseInputFile(inputFile, datafiles);
@@ -40,9 +42,11 @@ MIN_SUFFIX_SIZE(_MIN_SUFFIX_SIZE) {
     }
   }
   cout << "MAX READ LEN: " << maxLengthRead() << endl;
+COMP(ReadPhredContainer_ReadPhredContainer);
 }
 void ReadPhredContainer::parseInputFile(string const& inputFile, 
                                         vector<file_and_type> &datafiles) {
+START(ReadPhredContainer_parseInputFile);
   ifstream sock;
   sock.open(inputFile.c_str());
   cout << "Gathering datafiles from " << inputFile << "." << endl;
@@ -65,11 +69,13 @@ void ReadPhredContainer::parseInputFile(string const& inputFile,
          << endl;
   }
   sock.close();
+COMP(ReadPhredContainer_parseInputFile);
 }
 
 void ReadPhredContainer::loadFastqRawDataFromFile(string const& filename, 
                               vector<string> &processed_reads, 
                               vector<string> & processed_phreds) {
+START(ReadPhredContainer_loadFastqFromRawDataFile);
   gzFile data_file;
   data_file = gzopen(filename.c_str(), "r");    // open stream to next fastq.gz 
   kseq_t *seq = kseq_init(data_file);           // init parser
@@ -83,6 +89,7 @@ void ReadPhredContainer::loadFastqRawDataFromFile(string const& filename,
   kseq_destroy(seq);
   gzclose(data_file);
   qualityProcessRawData(&fastq_elements, &processed_reads, &processed_phreds, 0, fastq_elements.size(), 0);
+COMP(ReadPhredContainer_loadFastqFromRawDataFile);
 }
 
 void ReadPhredContainer::qualityProcessRawData(vector<fastq_t> *r_data, 
@@ -90,6 +97,7 @@ void ReadPhredContainer::qualityProcessRawData(vector<fastq_t> *r_data,
                            vector<string> *processed_phreds,
                            int from,
                            int to, int tid){
+START(ReadPhredContainer_qualityProcessRawData);
   processed_reads->reserve(to - from);
   processed_phreds->reserve(to - from);
   // Search through string, first determining quality, then 
@@ -129,12 +137,14 @@ void ReadPhredContainer::qualityProcessRawData(vector<fastq_t> *r_data,
   }
   processed_reads->shrink_to_fit();
   processed_phreds->shrink_to_fit();
+COMP(ReadPhredContainer_qualityProcessRawData);
 }
 
 unsigned int ReadPhredContainer::maxLengthRead() {
   return maxLen;
 }
 string::iterator ReadPhredContainer::returnStartIterator(Suffix_t &suf) {
+START(ReadPhredContainer_returnStartIterator);
   // Use suf.type and suf.read_id to locate the read, and then set an iterator
   // pointing at suf.offset dist from begining
   if(suf.type == HEALTHY) { 
@@ -151,9 +161,11 @@ string::iterator ReadPhredContainer::returnStartIterator(Suffix_t &suf) {
     }
     return TumourReads[suf.read_id].begin() + suf.offset;
   }
+COMP(ReadPhredContainer_returnStartIterator);
 }
 
 string::iterator ReadPhredContainer::returnEndIterator(Suffix_t &suf) {
+START(ReadPhredContainer_returnEndIterator);
   // Use suf.type and suf.read_id to locate the read, then return an iterator to the 
   // end of that read
   if (suf.type == HEALTHY) {
@@ -170,9 +182,11 @@ string::iterator ReadPhredContainer::returnEndIterator(Suffix_t &suf) {
     }
     return TumourReads[suf.read_id].end();
   }
+COMP(ReadPhredContainer_returnEndIterator);
 }
 
 string ReadPhredContainer::returnSuffix(Suffix_t &suf){
+START(ReadPhredContainer_returnSuffix);
   // return the string assoc. with suf
   if (suf.type == HEALTHY) {
     if (suf.read_id >= HealthyReads.size() || suf.read_id < 0) {
@@ -188,6 +202,7 @@ string ReadPhredContainer::returnSuffix(Suffix_t &suf){
     }
     return TumourReads[suf.read_id].substr(suf.offset);
   }
+COMP(ReadPhredContainer_returnSuffix);
 }
 
 unsigned int ReadPhredContainer::getSize(bool tissueType) {
@@ -200,6 +215,7 @@ unsigned int ReadPhredContainer::getSize(bool tissueType) {
 }
 
 string & ReadPhredContainer::getReadByIndex(int index, int tissue) {
+START(ReadPhredContainer_getReadByIndex);
   if(tissue == HEALTHY) {
     if (index >= HealthyReads.size() || index < 0) {
       cout << "getReadByIndex() out of bounds" << endl;
@@ -214,8 +230,10 @@ string & ReadPhredContainer::getReadByIndex(int index, int tissue) {
     }
     return TumourReads[index];
   }
+COMP(ReadPhredContainer_getReadByIndex);
 }
 string & ReadPhredContainer::getPhredString(int index, int tissue) {
+START(ReadPhredContainer_getPhredString);
   if(tissue == HEALTHY) {
     if (index >= HealthyPhreds.size() || index < 0) {
       cout << "getReadByIndex() out of bounds" << endl;
@@ -230,6 +248,7 @@ string & ReadPhredContainer::getPhredString(int index, int tissue) {
     }
     return TumourPhreds[index];
   }
+COMP(ReadPhredContainer_getPhredString);
 }
 
 char ReadPhredContainer::baseQuality(int index, int tissue, int pos) {

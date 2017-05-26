@@ -38,6 +38,7 @@ SNVIdentifier::SNVIdentifier(SuffixArray &_SA,
                                      MAX_LOW_CONFIDENCE_POS(mlcp),
                                      ECONT(e), 
                                      ALLELIC_FREQ_OF_ERROR(a) {
+START(SNVIdentifier_SNVIdentifier);
   if (GSA1_MCT > GSA2_MCT) GSA2_MCT = GSA1_MCT;
   reads = &_reads;  
   SA = &_SA;    
@@ -71,9 +72,11 @@ SNVIdentifier::SNVIdentifier(SuffixArray &_SA,
   }
   for (auto& t : w) t.join();
   cout << "Finished break point block construction" << endl;
+COMP(SNVIdentifier_SNVIdentifier);
 }
 
 void SNVIdentifier::buildConsensusPairsWorker(bpBlock* block, bpBlock* end){
+START(SNVIdentifier_buildConsensusPairsWorker);
  vector<consensus_pair> localThreadStore;
   for(; block < end; block++) {
     consensus_pair pair;
@@ -105,8 +108,11 @@ void SNVIdentifier::buildConsensusPairsWorker(bpBlock* block, bpBlock* end){
   for (consensus_pair const& p : localThreadStore) {
     consensus_pairs.push_back(p);
   }
+COMP(SNVIdentifier_buildConsensusPairsWorker);
 }
+
 bool SNVIdentifier::excessLowQuality(consensus_pair & pair) {
+START(SNVIdentifier_excessLowQuality);
   int numLowQuality{0};
   for (int pos = 0; pos < pair.mutated.size(); pos++) {
     if (pair.mqual[pos] == 'L' || pair.nqual[pos] == 'L' || pair.nqual[pos] == 'B') {
@@ -115,17 +121,21 @@ bool SNVIdentifier::excessLowQuality(consensus_pair & pair) {
   }
   if (numLowQuality > MAX_LOW_CONFIDENCE_POS) return true;
   else return false;
+COMP(SNVIdentifier_excessLowQuality);
 }
 
 void SNVIdentifier::maskLowQualityPositions(consensus_pair & pair) {
+START(SNVIdentifier_maskLowQualityPositions);
   for (int pos=0; pos < pair.mutated.size(); pos++) {
     if (pair.mqual[pos] != '-' || pair.nqual[pos + pair.left_ohang] != '-') {
       pair.mutated[pos] = pair.non_mutated[pos + pair.left_ohang];
     }
   }
+COMP(SNVIdentifier_maskLowQualityPositions);
 }
 
 void SNVIdentifier::trimCancerConsensus(consensus_pair & pair) {
+START(SNVIdentifier_trimCancerConsensus);
   if (pair.mut_offset > pair.nmut_offset) {
     pair.mutated.erase(0, pair.mut_offset - pair.nmut_offset);
     pair.mqual.erase(0, pair.mut_offset - pair.nmut_offset);
@@ -141,9 +151,11 @@ void SNVIdentifier::trimCancerConsensus(consensus_pair & pair) {
   else if (pair.mutated.size() < (pair.non_mutated.size() - pair.left_ohang)) {
     pair.right_ohang = (pair.non_mutated.size() - pair.left_ohang) - pair.mutated.size();
   }
+COMP(SNVIdentifier_trimCancerConsensus);
 }
 
 void SNVIdentifier::trimHealthyConsensus(consensus_pair & pair) {
+START(SNVIdentifier_trimHealthyConsensus);
   int left_arrow = 0, right_arrow = pair.nqual.size() - 1;
   for(; right_arrow >= 0 && 
         (pair.nqual[right_arrow] == 'T' ||
@@ -158,10 +170,12 @@ void SNVIdentifier::trimHealthyConsensus(consensus_pair & pair) {
   pair.nqual.erase(0, left_arrow);
   pair.non_mutated.erase(0, left_arrow);
   pair.nmut_offset -= left_arrow;
+COMP(SNVIdentifier_trimHealthyConsensus);
 }
 
 void SNVIdentifier::extractNonMutatedAlleles(bpBlock &block,
     consensus_pair &pair) {
+START(SNVIdentifier_extractNonMutatedAlleles);
   bool LEFT{false}, RIGHT{true};
   string query = pair.mutated.substr(pair.mut_offset, 30);
   string rcquery = reverseComplementString(query);
@@ -195,11 +209,14 @@ void SNVIdentifier::extractNonMutatedAlleles(bpBlock &block,
       }
     }
   }
+COMP(SNVIdentifier_extractNonMutatedAlleles);
 }
 
 void SNVIdentifier::generateConsensusSequence(bool tissue,
     bpBlock const& block, int & cns_offset, string & cns,
     string & qual) {
+START(SNVIdentifier_generateConsensusSequence);
+  START(collectSubset);
   std::vector<read_tag> subBlock;            // work with subset
   for (read_tag const& tag : block) {
     if (tissue == HEALTHY  && 
@@ -226,6 +243,8 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
   if(min_offset == std::numeric_limits<int>::max()) {
     min_offset = 0;
   }
+  COMP(collectSubset);
+  START(computecnsCount);
   vector<vector<int> > 
   cnsCount(4, vector<int>(max_offset + reads->maxLengthRead() - min_offset, 0));
   for (read_tag const & tag : subBlock) {
@@ -254,6 +273,8 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
       }
     }
   }
+  COMP(computecnsCount);
+  START(computeCNS);
   for (int pos=0; pos < cnsCount[0].size(); pos++) {
     int maxVal = 0, maxInd = 0;
     for(int base=0; base < 4; base++) {
@@ -269,6 +290,8 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
       case 3: cns += "G"; break;
     }
   }
+  COMP(computeCNS);
+  START(buildQualStr);
   cns_offset = max_offset;
   string q_str(cnsCount[0].size(), '-');
   for (int pos=0; pos < cnsCount[0].size(); pos++) {
@@ -286,11 +309,13 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
   }
   buildQualityString(q_str, cnsCount, cns, tissue);
   qual = std::move(q_str);
+  COMP(buildQualStr);
+COMP(SNVIdentifier_generateConsensusSequence);
 }
-
 
 void SNVIdentifier::buildQualityString(string & qual, vector< vector<int> > const& freq_matrix,
     string const& cns, bool tissue) {
+START(SNVIdentifier_buildQualityString);
   for (int pos=0; pos < cns.size(); pos++) {
     if (tissue == TUMOUR && qual[pos] == '-') { // do not override 'X'
       int base{0};
@@ -322,9 +347,11 @@ void SNVIdentifier::buildQualityString(string & qual, vector< vector<int> > cons
       }
     }
   }
+COMP(SNVIdentifier_buildQualityString);
 }
 
 void SNVIdentifier::extractCancerSpecificReads() {
+START(SNVIdentifier_extractCancerSpecificReads);
   unsigned int elementsPerThread = (SA->getSize()  / N_THREADS);
   vector<thread> w;
   unsigned int from = 0, to = elementsPerThread;
@@ -337,9 +364,11 @@ void SNVIdentifier::extractCancerSpecificReads() {
     else to += elementsPerThread;
   }
   for(auto &t: w) t.join();
+COMP(SNVIdentifier_extractCancerSpecificReads);
 }
 
 unsigned int SNVIdentifier::backUpSearchStart(unsigned int seedIndex) {
+START(SNVIdentifier_backUpSearchStart);
   if (seedIndex == 0) {
     return seedIndex;
   }
@@ -350,9 +379,11 @@ unsigned int SNVIdentifier::backUpSearchStart(unsigned int seedIndex) {
     if (seedIndex == 0) break;
   }
   return seedIndex;
+COMP(SNVIdentifier_backUpSearchStart);
 }
 
 void SNVIdentifier::extractionWorker(unsigned int seed_index, unsigned int to) {
+START(SNVIdentifier_extractionWorker);
   set<unsigned int> threadExtr;
   seed_index = backUpSearchStart(seed_index);
   unsigned int extension {seed_index + 1};
@@ -401,10 +432,12 @@ void SNVIdentifier::extractionWorker(unsigned int seed_index, unsigned int to) {
   for(unsigned int extracted_cancer_read : threadExtr) {
       CancerExtraction.insert(extracted_cancer_read);
   }
+COMP(SNVIdentifier_extractionWorker);
 }
 
 
 void SNVIdentifier::seedBreakPointBlocks() {
+START(SNVIdentifier_seedBreakPointBlocks);
   string concat("");
   vector<pair<unsigned int, unsigned int>> bsa;
   set<unsigned int>::iterator it = CancerExtraction.begin();
@@ -458,12 +491,13 @@ void SNVIdentifier::seedBreakPointBlocks() {
   gsa.shrink_to_fit();
   cout << "GSA2 size: " << gsa.size()<< endl;
   extractGroups(gsa);
+COMP(SNVIdentifier_seedBreakPointBlocks);
 }
 
 void SNVIdentifier::transformBlock(unsigned long long* from, 
      unsigned long long* to, vector< pair<unsigned int, unsigned int> > *bsa,
      vector<read_tag> *block) {
-
+START(SNVIdentifier_transformBlock);
   for (; from < to; from++) {
     pair<unsigned int, unsigned int> readConcat = SA->binarySearch(*bsa,*from);
     int offset = *from - readConcat.second;
@@ -484,9 +518,11 @@ void SNVIdentifier::transformBlock(unsigned long long* from,
     t.tissue_type = TUMOUR;
     block->push_back(t);
   }
+COMP(SNVIdentifier_transformBlock);
 }
 
 string SNVIdentifier::readTagToString(read_tag const& tag) {
+START(SNVIdentifier_readTagToString);
   string read = reads->getReadByIndex(tag.read_id, tag.tissue_type);
   int offset = tag.offset;
   string dollar = "";
@@ -496,9 +532,11 @@ string SNVIdentifier::readTagToString(read_tag const& tag) {
     dollar = TERM;
   }
   return read.substr(offset) + dollar;
+COMP(SNVIdentifier_readTagToString);
 }
 
 int SNVIdentifier::computeLCP(read_tag const& a, read_tag const& b) {
+START(SNVIdentifier_computeLCP);
   string a_str = readTagToString(a);
   string b_str = readTagToString(b);
   int lcp = 0;
@@ -506,9 +544,11 @@ int SNVIdentifier::computeLCP(read_tag const& a, read_tag const& b) {
          lcp < b_str.length() &&
          a_str[lcp] == b_str[lcp]) lcp++;
   return lcp;
+COMP(SNVIdentifier_computeLCP);
 }
 
 void SNVIdentifier::extractGroups(vector<read_tag> const& gsa) {
+START(SNVIdentifier_extractGroups);
   unsigned int elementsPerThread = gsa.size() / N_THREADS;
   vector<thread> workers;
   unsigned int from{0}, to{elementsPerThread};
@@ -522,10 +562,13 @@ void SNVIdentifier::extractGroups(vector<read_tag> const& gsa) {
     else to += elementsPerThread;
   }
   for (auto &t : workers) t.join();
+COMP(SNVIdentifier_extractGroups);
 }
+
 void SNVIdentifier::extractGroupsWorker(unsigned int seedIndex,
                                             unsigned int to,
                                             vector<read_tag> const* gsa_ptr) {
+START(SNVIdentifier_extractGroupsWorker);
   vector<bpBlock> localThreadStore;
   vector<read_tag> const& gsa = *gsa_ptr;
   // backup to block start
@@ -559,15 +602,19 @@ void SNVIdentifier::extractGroupsWorker(unsigned int seedIndex,
   }
   std::lock_guard<std::mutex> lock(extractGroupsWorkerLock);
   SeedBlocks.insert(SeedBlocks.end(), localThreadStore.begin(), localThreadStore.end());
+COMP(SNVIdentifier_extractGroupsWorker);
 }
 
 string SNVIdentifier::addGaps(int n_gaps) {
+START(SNVIdentifier_addGaps);
   string gaps(n_gaps, '-');
   return gaps;
+COMP(SNVIdentifier_addGaps);
 }
 
 bool SNVIdentifier::extendBlock(int seed_index, 
     bpBlock &block, bool orientation, int calibration) {
+START(SNVIdentifier_extendBlock);
   // seed_index is the index of the unique suffix_t this function
   // was called with. 
   bool success_left{false}, success_right{false};
@@ -584,18 +631,20 @@ bool SNVIdentifier::extendBlock(int seed_index,
   if (left_of_seed >= 30 && seed_index > 0){
     success_left = getSuffixesFromLeft(seed_index, block, orientation, calibration);
     // success_left = groupSuffixes(1, seed_index, block, orientation,
-    // calibration);
+     //calibration);
   }
   if (right_of_seed >= 30 && seed_index < (SA->getSize() - 1)) {
     success_right = getSuffixesFromRight(seed_index, block, orientation, calibration);
-    //success_right = groupSuffixecs(-1, seed_index, block, orientation,
-    //calibration);
+//    success_right = groupSuffixes(-1, seed_index, block, orientation,
+ //   calibration);
   }
   return success_left || success_right;
+COMP(SNVIdentifier_extendBlock);
 }
 
 bool SNVIdentifier::groupSuffixes(int direction, int seedIndex, bpBlock &block,
     bool orientation, int calibration) {
+START(SNVIdentifier_groupsSuffixes);
   bool success{false};
   int arrow{seedIndex + direction};
   while (arrow >= 0 && arrow < SA->getSize() && 
@@ -616,10 +665,11 @@ bool SNVIdentifier::groupSuffixes(int direction, int seedIndex, bpBlock &block,
     arrow += direction;
   }
   return success;
+COMP(SNVIdentifier_groupsSuffixes);
 }
 bool SNVIdentifier::getSuffixesFromLeft(int seed_index,
   bpBlock &block, bool orientation, int calibration) {
-
+START(SNVIdentifier_getSuffixesFromLeft);
   bool success = false;
   int left_arrow = seed_index-1;
   // While lexicographally adjacent suffixes share the same lcp value
@@ -658,11 +708,12 @@ bool SNVIdentifier::getSuffixesFromLeft(int seed_index,
     left_arrow--;
   }
   return success;
+COMP(SNVIdentifier_getSuffixesFromLeft);
 }
 
 bool SNVIdentifier::getSuffixesFromRight(int seed_index,
     bpBlock&block, bool orientation, int calibration) {
-
+START(SNVIdentifier_getSuffixesFromRight);
   bool success = false;
   int right_arrow = seed_index+1;
   // While lexicographically adjacent suffixes share the same lcp val
@@ -698,6 +749,7 @@ bool SNVIdentifier::getSuffixesFromRight(int seed_index,
     right_arrow++;
   }
   return success;
+COMP(SNVIdentifier_getSuffixesFromRight);
 }
 
 
@@ -706,6 +758,7 @@ int SNVIdentifier::minVal(int a, int b) {
 }
 
 bool SNVIdentifier::lexCompare(string const& l, string const& r, unsigned int min_lr) {
+START(SNVIdentifier_lexCompare);
   // return true if l < r
   // min_lr avoids redundant searches 
 
@@ -723,9 +776,11 @@ bool SNVIdentifier::lexCompare(string const& l, string const& r, unsigned int mi
 
   // One is prefix of other, return the prefix as higher suffix
   return (l_iter == l_end) && (r_iter != r_end);
+COMP(SNVIdentifier_lexCompare);
 }
 
 long long int SNVIdentifier::binarySearch(string query) {
+START(SNVIdentifier_binarySearch);
   // Search bounds
   unsigned int right{SA->getSize() - 1};   // start at non-out of bounds
   unsigned int left{0};
@@ -775,17 +830,21 @@ long long int SNVIdentifier::binarySearch(string query) {
     min_left_right = minVal(lcp_left_query, lcp_right_query);
   }
   return -1; // no match
+COMP(SNVIdentifier_binarySearch);
 }
 
 int SNVIdentifier::lcp(string const& l, string const& r, unsigned int mlr) {
+START(SNVIdentifier_lcp);
   while (mlr < l.length() && mlr < r.length() && l[mlr] == r[mlr]) {
     mlr++;
   }
   return mlr;
+COMP(SNVIdentifier_lcp);
 }
 
 
 void SNVIdentifier::mergeBlocks(bpBlock & to, bpBlock & from) {
+START(SNVIdentifier_mergeBlocks);
   bpBlock::iterator f_it = from.begin();
   bpBlock::iterator common_read;
   // Find read in common between blocks.
@@ -839,14 +898,18 @@ void SNVIdentifier::mergeBlocks(bpBlock & to, bpBlock & from) {
     }
     to.insert(*it);
   }
+COMP(SNVIdentifier_mergeBlocks);
 }
 
 int SNVIdentifier::convertOffset(read_tag const& tag) {
+START(SNVIdentifier_convertOffset);
   int sz = reads->getReadByIndex(tag.read_id, tag.tissue_type).size();
   return sz - (tag.offset + reads->getMinSuffixSize() + 1);
+COMP(SNVIdentifier_convertOffset);
 }
 
 void SNVIdentifier::unifyBlocks(vector<bpBlock> & seedBlocks) {
+START(SNVIdentifier_unifyBlocks);
   std::sort(
     seedBlocks.begin(), seedBlocks.end(), 
     [](bpBlock const& a, bpBlock const& b) {
@@ -925,6 +988,7 @@ void SNVIdentifier::unifyBlocks(vector<bpBlock> & seedBlocks) {
       BreakPointBlocks.push_back(seedBlocks[status.id]);
     }
   }
+COMP(SNVIdentifier_unifyBlocks);
 }
 
 unsigned int SNVIdentifier::getSize() {
@@ -1396,21 +1460,21 @@ void BreakPointBlocks::extractNonMutatedAlleles() {
 //      continue;
 //    }
 //
-//    START(queryBuild);
+//    START(SNVIdentifier_queryBuild);
 //    string query = pair.mutated.substr(i, reads->getMinSuffixSize());
 //    string rcquery = reverseComplementString(query);
 //    END(queryBuild);
 //    TIME(queryBuild);
 //    PRINT(queryBuild);
 //
-//    START(binSearch);
+//    START(SNVIdentifier_binSearch);
 //    long long int fwd_idx = binarySearch(query);
 //    long long int rev_idx = binarySearch(rcquery);
 //    END(binSearch);
 //    TIME(binSearch);
 //    PRINT(binSearch);
 //
-//    START(extendBlock);
+//    START(SNVIdentifier_extendBlock);
 //    if (fwd_idx != -1) {
 //      extendBlock(fwd_idx, block.block, RIGHT, pair.mut_offset - i);
 //      //for (read_tag const& tag : fwd_result) {
