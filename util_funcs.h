@@ -22,6 +22,7 @@ void split_string(std::string s, std::string tokens, std::vector<std::string>
     &fields);
 
 std::string reverseComplementString(std::string const& s);
+std::string* reverseComplementStringHeap(std::string const& s);
 
 struct consensus_pair {
   std::string mutated;

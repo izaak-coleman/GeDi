@@ -54,3 +54,20 @@ START(Util_reverseComplementString);
   return revcomp;
 COMP(Util_reverseComplementString);
 }
+
+string* reverseComplementStringHeap(string const& s) {
+START(Util_reverseComplementStringHeap);
+  string* revcomp = new string("");
+  for(int i = s.size()-1; i >= 0; i--) {
+  // travel in reverse and switch for complementary
+    switch(s[i]) {
+      case 'A': *revcomp += "T"; break;
+      case 'T': *revcomp += "A"; break;
+      case 'C': *revcomp += "G"; break;
+      case 'G': *revcomp += "C"; break;
+    }
+  }
+  return revcomp;
+COMP(Util_reverseComplementStringHeap);
+}
+

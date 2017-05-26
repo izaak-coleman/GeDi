@@ -15,6 +15,7 @@
 #define PRINT(x) std::stringstream x##_ss; x##_ss << #x << "(), " << x##time << std::endl;\
                  std::string x##_str = x##_ss.str(); \
                  std::cout << x##_str;
+
 #define COMP(X)  END(X); TIME(X); PRINT(X);
 
 #define CSTART(x) \

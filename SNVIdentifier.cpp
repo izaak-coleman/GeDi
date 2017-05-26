@@ -216,7 +216,6 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
     bpBlock const& block, int & cns_offset, string & cns,
     string & qual) {
 START(SNVIdentifier_generateConsensusSequence);
-  START(collectSubset);
   std::vector<read_tag> subBlock;            // work with subset
   for (read_tag const& tag : block) {
     if (tissue == HEALTHY  && 
@@ -243,24 +242,22 @@ START(SNVIdentifier_generateConsensusSequence);
   if(min_offset == std::numeric_limits<int>::max()) {
     min_offset = 0;
   }
-  COMP(collectSubset);
+
   START(computecnsCount);
   vector<vector<int> > 
   cnsCount(4, vector<int>(max_offset + reads->maxLengthRead() - min_offset, 0));
   for (read_tag const & tag : subBlock) {
-    string read = reads->getReadByIndex(tag.read_id, tag.tissue_type);
-    string phred = reads->getPhredString(tag.read_id, tag.tissue_type);
+    string * read = &reads->getReadByIndex(tag.read_id, tag.tissue_type);
+    string * phred = &reads->getPhredString(tag.read_id, tag.tissue_type);
     if(tag.orientation == LEFT) {
-      read = reverseComplementString(read);
-      std::reverse(phred.begin(), phred.end());
+      read = reverseComplementStringHeap(*read);
+      phred = new string(*phred);
+      std::reverse(phred->begin(), phred->end());
     }
-    else {
-      read.pop_back();    // remove dollar symbol
-    }
-    for(int i=0; i < read.size(); i++) {
+    for(int i=0; i < read->size(); i++) {
       // only allow high quality bases to contribute to consensus
-      if (phred[i] >= MIN_PHRED_QUAL) {
-        switch(read[i]) {
+      if ((*phred)[i] >= MIN_PHRED_QUAL) {
+        switch((*read)[i]) {
           case 'A':
             cnsCount[0][(max_offset - tag.offset) + i]++; break;
           case 'T':
@@ -271,6 +268,10 @@ START(SNVIdentifier_generateConsensusSequence);
             cnsCount[3][(max_offset - tag.offset) + i]++; break;
         }
       }
+    }
+    if (tag.orientation == LEFT) {
+      delete read;
+      delete phred;
     }
   }
   COMP(computecnsCount);
