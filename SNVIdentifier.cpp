@@ -259,13 +259,13 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
       if ((*phred)[i] >= MIN_PHRED_QUAL) {
         switch((*read)[i]) {
           case 'A':
-            cnsCount[          (max_offset - tag.offset) + i]++; break;
+            cnsCount[(max_offset - tag.offset) + i*4    ]++; break;
           case 'T':
-            cnsCount[  width + (max_offset - tag.offset) + i]++; break;
+            cnsCount[(max_offset - tag.offset) + i*4 + 1]++; break;
           case 'C':
-            cnsCount[2*width + (max_offset - tag.offset) + i]++; break;
+            cnsCount[(max_offset - tag.offset) + i*4 + 2]++; break;
           case 'G':
-            cnsCount[3*width + (max_offset - tag.offset) + i]++; break;
+            cnsCount[(max_offset - tag.offset) + i*4 + 3]++; break;
         }
       }
     }
@@ -279,8 +279,8 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
   for (int pos=0; pos < width; pos++) {
     int maxVal = 0, maxInd = 0;
     for(int base=0; base < 4; base++) {
-      if (cnsCount[base * width + pos] > maxVal) {
-        maxVal = cnsCount[base * width + pos];
+      if (cnsCount[pos*4 + base] > maxVal) {
+        maxVal = cnsCount[pos*4 + base];
         maxInd = base;
       }
     }
@@ -298,7 +298,7 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
   for (int pos=0; pos < width; pos++) {
     // mask all positions with reads less than >= GSA2_MCT
     int nreads=0;
-    for (int base=0; base < 4; base++) nreads += cnsCount[base * width + pos];
+    for (int base=0; base < 4; base++) nreads += cnsCount[pos*4 + base];
     if (nreads < GSA2_MCT) {
       if (tissue == TUMOUR) {
         q_str[pos] = 'X';
@@ -326,16 +326,16 @@ void SNVIdentifier::buildQualityString(string & qual, vector<int> const& freq_ma
         case 'C': base = 2; break;
         case 'G': base = 3; break;
       }
-      if (freq_matrix[base * width + pos] < GSA2_MCT) {
+      if (freq_matrix[pos*4 + base] < GSA2_MCT) {
         qual[pos] = 'C';
         continue;
       }
     }
     double total_bases = 0;
-    for (int base = 0; base < 4; base++) total_bases += freq_matrix[base * width + pos];
+    for (int base = 0; base < 4; base++) total_bases += freq_matrix[pos*4 + base];
     int n_bases_above_err_freq{0};
     for(int base = 0; base < 4; base++) {
-      if((freq_matrix[base * width + pos] / total_bases) > ALLELIC_FREQ_OF_ERROR) {
+      if((freq_matrix[pos*4 + base] / total_bases) > ALLELIC_FREQ_OF_ERROR) {
         n_bases_above_err_freq++;
       }
     }
