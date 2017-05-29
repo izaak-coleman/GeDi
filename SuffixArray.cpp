@@ -1,4 +1,9 @@
-// SuffixArray.cpp
+/*
+SuffixArray.cpp
+Author: Izaak Coleman
+*/
+
+
 #include <iostream>
 #include <string>
 #include <vector>
@@ -23,24 +28,22 @@
 using namespace std;
 
 SuffixArray::SuffixArray(ReadPhredContainer &reads, int m, int n):
-N_THREADS(n), MIN_SUFFIX(m) {
+N_THREADS(n), MIN_SUFFIX_SIZE(m) {
 //START(SuffixArray_SuffixArray);
-  cout << "MIN SUFFIX " <<  MIN_SUFFIX << endl;
+  cout << "MIN SUFFIX " <<  MIN_SUFFIX_SIZE << endl;
   this->reads = &reads;
-  cout << "Starting parallelGenRadixSA:" << endl;
-  parallelGenRadixSA(MIN_SUFFIX);
+  cout << "Starting constructColouredGSA:" << endl;
+  constructColouredGSA(MIN_SUFFIX_SIZE);
   cout << "GSA1 size: " << SA.size() << endl;
 //COMP(SuffixArray_SuffixArray);
 }
 
-void SuffixArray::parallelGenRadixSA(int min_suffix) {
-//START(SuffixArray_parallelGenRadixSA);
+void SuffixArray::constructColouredGSA(int min_suffix) {
+//START(SuffixArray_constructColouredGSA);
   vector<thread> BSA_and_SA;
   unsigned long long *radixSA;   // Pointer to suffix array
-  unsigned int startOfTumour;    // Index of tumour reads in concat
+  unsigned int startOfTumour;
   unsigned int radixSASize;
-
-  // Construct binary search arrays and suffix array
   cout << "Making SA" << endl;
   vector<pair<unsigned int, unsigned int> > healthyBSA;
   vector<pair<unsigned int, unsigned int> > tumourBSA;
@@ -49,15 +52,16 @@ void SuffixArray::parallelGenRadixSA(int min_suffix) {
         &healthyBSA, &tumourBSA)
   );
   BSA_and_SA.push_back(
-      std::thread(&SuffixArray::generateParallelRadix, this, 
+      std::thread(&SuffixArray::constructSuffixArray, this, 
         &radixSA, &startOfTumour, &radixSASize)
   );
+  // Transform to coloured GSA
   for(auto & t : BSA_and_SA) t.join();
-  // Construct Generalized Suffix Array
   cout << "radix sa size " << radixSASize << endl;
   cout << "Making GSA" << endl;
   vector<thread> workers;
   vector<vector<Suffix_t>> arrayBlocks(N_THREADS, vector<Suffix_t>());
+  // Divide work roughly evenly between deployed threads
   unsigned int elementsPerThread = (radixSASize/N_THREADS);
   unsigned int from{0}, to {elementsPerThread};
   for(unsigned int i = 0; i < N_THREADS; i++) {
@@ -65,7 +69,6 @@ void SuffixArray::parallelGenRadixSA(int min_suffix) {
     std::thread(&SuffixArray::transformSuffixArrayBlock, this, &arrayBlocks[i], 
         &healthyBSA, &tumourBSA, radixSA, from, to, startOfTumour, min_suffix)
     );
-    // Set up next threads block bounds
     from = to;
     if(i == N_THREADS - 2) {
       to = radixSASize;
@@ -75,15 +78,14 @@ void SuffixArray::parallelGenRadixSA(int min_suffix) {
     }
   }
   for(auto &thread : workers) thread.join();
-
-  // Load thread work into GSA
+  // Copy transformed elements to GSA
   delete radixSA;
   for(vector<Suffix_t> & b : arrayBlocks) {
     SA.insert(SA.end(), b.begin(), b.end());
     b.clear();
   }
   SA.shrink_to_fit();
-//COMP(SuffixArray_parallelGenRadixSA);
+//COMP(SuffixArray_constructColouredGSA);
 }
 
 void SuffixArray::transformSuffixArrayBlock(vector<Suffix_t> *block, 
@@ -93,7 +95,6 @@ void SuffixArray::transformSuffixArrayBlock(vector<Suffix_t> *block,
     unsigned int to, unsigned int startOfTumour, int min_suf) {
 //START(SuffixArray_transformSuffixArrayBlock);
   for(unsigned int i=from; i < to; i++) {
-    // extract mapping, determining which read the suffix belongs to
     Suffix_t s;
     pair<unsigned int, unsigned int> rcPair;
     if (radixSA[i] < startOfTumour) { // HEALTHY
@@ -136,10 +137,10 @@ void SuffixArray::generateBSA(
 //COMP(SuffixArray_generateBSA);
 }
 
-void SuffixArray::generateParallelRadix(unsigned long long **radixSA, 
+void SuffixArray::constructSuffixArray(unsigned long long **radixSA, 
                                         unsigned int *startOfTumour,
                                         unsigned int *sizeOfRadixSA) {
-//START(SuffixArray_generateParallelRadix);
+//START(SuffixArray_constructSuffixArray);
   // concatenate all reads
   string concat = concatenateReads(HEALTHY);
   *startOfTumour = concat.size();            // mark the end of healthy seqs 
@@ -147,7 +148,7 @@ void SuffixArray::generateParallelRadix(unsigned long long **radixSA,
   *sizeOfRadixSA = concat.size();
   // Build SA
   *radixSA = Radix<unsigned long long>((uchar*) concat.c_str(), concat.size()).build();
-//COMP(SuffixArray_generateParallelRadix);
+//COMP(SuffixArray_constructSuffixArray);
 }
 
 pair<unsigned int, unsigned int> 

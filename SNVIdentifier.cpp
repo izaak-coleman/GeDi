@@ -1,4 +1,9 @@
-// SNVIdentifier.cpp
+/*
+SNVIdentifier.cpp
+Author: Izaak Coleman
+*/
+
+
 #include <vector>
 #include <iostream>
 #include <fstream>
@@ -24,7 +29,7 @@
 #include "benchmark.h"
 using namespace std;
 
-static const string TERM = "$";
+const string TERM = "$";
 
 SNVIdentifier::SNVIdentifier(SuffixArray &_SA, 
                                      ReadPhredContainer &_reads,
@@ -254,20 +259,20 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
       phred = new string(*phred);
       std::reverse(phred->begin(), phred->end());
     }
+    char* readPtr = &(*read)[0];
+    char* phredPtr = &(*phred)[0];
     for(int i=0; i < read->size(); i++) {
       // only allow high quality bases to contribute to consensus
-      if ((*phred)[i] >= MIN_PHRED_QUAL) {
-        switch((*read)[i]) {
+        switch (*(readPtr + i)) {
           case 'A':
-            cnsCount[(max_offset - tag.offset + i)*4    ]++; break;
-          case 'T':
-            cnsCount[(max_offset - tag.offset + i)*4 + 1]++; break;
-          case 'C':
-            cnsCount[(max_offset - tag.offset + i)*4 + 2]++; break;
-          case 'G':
-            cnsCount[(max_offset - tag.offset + i)*4 + 3]++; break;
+            cnsCount[(max_offset - tag.offset + i)*4    ] += 1 & (*(phredPtr + i) >= MIN_PHRED_QUAL); break;
+          case 'T':                               
+            cnsCount[(max_offset - tag.offset + i)*4 + 1] += 1 & (*(phredPtr + i) >= MIN_PHRED_QUAL); break;
+          case 'C':                               
+            cnsCount[(max_offset - tag.offset + i)*4 + 2] += 1 & (*(phredPtr + i) >= MIN_PHRED_QUAL); break;
+          case 'G':                               
+            cnsCount[(max_offset - tag.offset + i)*4 + 3] += 1 & (*(phredPtr + i) >= MIN_PHRED_QUAL); break;
         }
-      }
     }
     if (tag.orientation == LEFT) {
       delete read;
@@ -308,14 +313,14 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
       }
     }
   }
-  buildQualityString(q_str, cnsCount, width, cns, tissue);
+  buildQualityString(q_str, cnsCount, cns, tissue);
   qual = std::move(q_str);
   //COMP(buildQualStr);
 //COMP(SNVIdentifier_generateConsensusSequence);
 }
 
 void SNVIdentifier::buildQualityString(string & qual, vector<int> const& freq_matrix,
-    int width, string const& cns, bool tissue) {
+    string const& cns, bool tissue) {
 //START(SNVIdentifier_buildQualityString);
   for (int pos=0; pos < cns.size(); pos++) {
     if (tissue == TUMOUR && qual[pos] == '-') { // do not override 'X'
@@ -631,43 +636,14 @@ bool SNVIdentifier::extendBlock(int seed_index,
   }
   if (left_of_seed >= 30 && seed_index > 0){
     success_left = getSuffixesFromLeft(seed_index, block, orientation, calibration);
-    // success_left = groupSuffixes(1, seed_index, block, orientation,
-     //calibration);
   }
   if (right_of_seed >= 30 && seed_index < (SA->getSize() - 1)) {
     success_right = getSuffixesFromRight(seed_index, block, orientation, calibration);
-//    success_right = groupSuffixes(-1, seed_index, block, orientation,
- //   calibration);
   }
   return success_left || success_right;
 //COMP(SNVIdentifier_extendBlock);
 }
 
-bool SNVIdentifier::groupSuffixes(int direction, int seedIndex, bpBlock &block,
-    bool orientation, int calibration) {
-//START(SNVIdentifier_groupsSuffixes);
-  bool success{false};
-  int arrow{seedIndex + direction};
-  while (arrow >= 0 && arrow < SA->getSize() && 
-         ::computeLCP(SA->getElem(arrow), SA->getElem(seedIndex), *reads) >=
-           reads->getMinSuffixSize()) {
-    read_tag nextRead;
-    nextRead.read_id = SA->getElem(arrow).read_id;
-    nextRead.orientation = orientation;
-    nextRead.offset = SA->getElem(arrow).offset;
-    if (orientation == RIGHT) nextRead.offset += calibration;
-    else nextRead.offset -= calibration;
-
-    if(SA->getElem(arrow).type == HEALTHY) nextRead.tissue_type = HEALTHY;
-    else nextRead.tissue_type = SWITCHED;
-
-    pair<bpBlock::iterator, bool> insertion = block.insert(nextRead);
-    if (insertion.second == true) success = true;
-    arrow += direction;
-  }
-  return success;
-//COMP(SNVIdentifier_groupsSuffixes);
-}
 bool SNVIdentifier::getSuffixesFromLeft(int seed_index,
   bpBlock &block, bool orientation, int calibration) {
 //START(SNVIdentifier_getSuffixesFromLeft);

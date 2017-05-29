@@ -1,3 +1,9 @@
+/*
+Reads.h
+Author: Izaak Coleman
+*/
+
+
 #ifndef READS_H
 #define READS_H
 
@@ -23,37 +29,55 @@ struct file_and_type {
 class ReadPhredContainer {
 private:
   const int MIN_SUFFIX_SIZE;
-  unsigned int maxLen;
-  // Index correspondence between Reads/Phreds
+
+  // Length of the longest read
+  unsigned int maxLen;          
+ 
+  // Containers storing the reads and their associated phred strings.
+  // Corresponding reads and phred strings share the same indicies in their
+  // respective containers.
   std::vector<std::string> HealthyReads;
   std::vector<std::string> HealthyPhreds;
   std::vector<std::string> TumourReads;
   std::vector<std::string> TumourPhreds;
+
   void parseInputFile(std::string const& inputFile, 
            std::vector<file_and_type> &datafiles);
+  // Parses the input file containing the file paths, names and
+  // data types of the data files. 
+  // Separates the fields and stores them in datafiles
 
   void loadFastqRawDataFromFile(std::string const& filename, 
                               std::vector<std::string> & processed_reads,
                               std::vector<std::string> &processed_phreds);
+  // Loads the fastq data in filename into processed_read and processed_phreds,
+  // processing them with qualityProcessRawData()
 
   void qualityProcessRawData(std::vector<fastq_t> *r_data, 
                             std::vector<std::string> *processed_reads,
                             std::vector<std::string> *processed_phreds,
                             int from, int to, int tid);
+  // Performs the following in the order given:
+  //  -- Discards reads with a greater than QUALITY_THRESH percentage
+  //     of bases that have a phred score less than PHRED_20
+  //  -- Removes 'N' characters by spliting a read into substrings that flank
+  //     'N's. Resulting substrings with length < MIN_SUFFIX_SIZE are discarded.
+  //  -- Appends TERM_CHAR to each read, for GSA construction.
 public:
 
   ReadPhredContainer(std::string const& inputFile);
 
   char baseQuality(int index, int tissue, int pos);
+  // Returns Healthy/TumourPhreds[index][pos]
 
   std::string & getPhredString(int index, int tissue);
 
   std::string::iterator returnStartIterator(Suffix_t &suf);
-  
+  // Returns iterator to start of suffix represented by suf 
   std::string::iterator returnEndIterator(Suffix_t &suf);
-
+  // Returns iterator to end of suffix represented by suf
   std::string returnSuffix(Suffix_t &suf);
-
+  // Returns string of suffix represented by suf
   std::string & getReadByIndex(int index, int tissue);
 
   unsigned int getSize(bool tissueType);

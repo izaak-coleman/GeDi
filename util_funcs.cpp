@@ -1,4 +1,9 @@
-// util_funcs.cpp
+/*
+util_funcs.cpp
+Author: Izaak Coleman
+*/
+
+
 #include <string>
 #include <cstring>
 #include <vector>

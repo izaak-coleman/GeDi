@@ -1,3 +1,9 @@
+/*
+main.cpp
+Author: Izaak Coleman
+*/
+
+
 #include <iostream>
 #include <vector>
 #include <string>

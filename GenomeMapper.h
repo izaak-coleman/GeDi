@@ -1,3 +1,8 @@
+/*
+GenomeMapper.h
+Author: Izaak Coleman
+*/
+
 #ifndef GENOMEMAPPER_H
 #define GENOMEMAPPER_H
 
@@ -9,18 +14,10 @@
 #include "Reads.h"
 #include "SamEntry.h"
 
-struct snv_aln_info {
- std::vector<int> SNV_pos;
- int flag;
- int chr;
- int position;
- int left_ohang;
- int right_ohang;
- std::string non_mutated_cns;
- std::string mutated_cns;
- unsigned int pair_id;
-};
 
+// In order to sort the mulitple potential SNVs present in a 
+// SamEntry, each SNV is stored as a single_snv along with
+// relevant information from the SamEntry.
 struct single_snv {
  int flag;
  std::string chr;
@@ -32,23 +29,36 @@ struct single_snv {
 
 class GenomeMapper {
 private:
-  const int MIN_MAPQ;
-  const std::string CHR;
-  SNVIdentifier *snvId; 
+  const int MIN_MAPQ;       // Discard SamEntries with MAPQ < MIN_MAPQ
+  const std::string CHR;    // Discard SamEntries not aligned to CHR
+  SNVIdentifier *snvId;     
   ReadPhredContainer *reads;
 
   void identifySNVs(std::vector<SamEntry> &alignments);
+  // Calls countSNVs() for all valid SamEntries, translating the
+  // consensus sequence complementarity to that of the reference genome.
 
   void countSNVs(SamEntry &alignment, int left);
+  // Compares consensus sequences identifying SNVs.
 
-  void constructSNVFastqData(std::string const& samName);
+  void constructSNVFastqData(std::string const& fastqName);
+  // Builds the fastq file from the consensus pairs. Fastq file will
+  // be used to align against the reference genome.
+  // Fastq element structure:
+  //
+  // @TumourConsensusSequence[left_ohang;right_ohang]
+  // HealthyConsensusSequence
+  // +
+  // DummyQualityString (!)'s of length HealthyConsensusSequence
 
   void parseSamFile(std::vector<SamEntry> &alignments, std::string filename);
+  // Builds list of SamEntries from sam file
 
   static bool compareSNVLocations(const single_snv &a, const single_snv &b);
+  // Comparison logic for single_snv data type.
 
   void outputSNVToUser(std::vector<SamEntry> &alignments, std::string reportFilename);
-
+  // Reports the list of SNVs
 
 public:
     GenomeMapper(SNVIdentifier &snv, ReadPhredContainer &reads,

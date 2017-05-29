@@ -1,3 +1,9 @@
+/*
+SamEntry.cpp
+Author: Izaak Coleman
+*/
+
+
 #include <string>
 #include <vector>
 #include <map>

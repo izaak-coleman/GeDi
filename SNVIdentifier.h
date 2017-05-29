@@ -1,20 +1,26 @@
+/*
+SNVIdentifier.h
+Author: Izaak Coleman
+*/
+
+
 #ifndef SNVIDENTIFIER_H 
 #define SNVIDENTIFIER_H 
 
 #include <vector>
 #include <string>
 #include <iostream>
-#include <set>      // contain reads
-#include <utility>  // need coordinates to define read index, bool
+#include <set>
+#include <utility>
 #include <mutex>
 
 #include "util_funcs.h"
 #include "Suffix_t.h"
 #include "SuffixArray.h"
 
-// a read_tag is extracted for each read in a break ppoint
-// block determining now the read aligns to the other
-// reads in its block, and its aligned orientation
+// read_tag is used for elements of second GSA
+// to determine which cancer specific reads
+// derive from the same genomic locations.
 struct read_tag{
   unsigned int read_id;
   mutable int offset;
@@ -23,17 +29,11 @@ struct read_tag{
 };
 
 struct read_tag_compare{
-  // this functor only compares the read id from hashtag
-  // the other data is considered metadata that I can use later
-
+  // Functor for read_tag comparison logic.
   bool operator() (const read_tag &a, const read_tag &b) const {
-
-    // the comparison needs to avoid adding duplicate reads.
-    // duplicate reads will have the same read_id val, and
-    // derive from the same data set, either H,H or T,S.
-    // As such, when comparisons between H,T and H,S are made,
-    // it is perfectly valid for both elems to have same read_id val
-    // this comparison allows for this
+    // Within the set read_tags are:
+    // -- First sorted by tissue type TUMOUR = SWITCHED < HEALTHY
+    // -- Then sorted by read_id
     if( (a.tissue_type == TUMOUR || a.tissue_type == SWITCHED) &&
         (b.tissue_type == TUMOUR || b.tissue_type == SWITCHED) ) {
         return a.read_id < b.read_id;
@@ -48,36 +48,35 @@ struct read_tag_compare{
 };
 
 using bpBlock = std::set<read_tag, read_tag_compare>;
-//struct bp_block {
-//  std::set<read_tag, read_tag_compare> block;
-//  unsigned int id;
-//
-//  // wrap insert func to avoid refactoring
-//  void insert(read_tag r) {
-//    block.insert(r);
-//  }
-//
-//  int size() {
-//    return block.size();
-//  }
-//
-//  void clear() {
-//    block.clear();
-//    id = 0;
-//  }
-//};
-
 
 class SNVIdentifier {
 private:
-  const char MIN_PHRED_QUAL;
-  const int GSA1_MCT;
-  int GSA2_MCT;
-  const int COVERAGE_UPPER_THRESHOLD;
-  const int N_THREADS;
-  const int MAX_LOW_CONFIDENCE_POS;
-  const double ECONT;
-  const double ALLELIC_FREQ_OF_ERROR;
+  static const char MIN_PHRED_QUAL;
+  // Read characters with a phred score < MIN_PHRED_QUAL will not contribute to 
+  // the consensus sequence.
+
+  static const int GSA1_MCT;
+  // Blocks of suffixes covering the same genomic location in the coloured GSA,
+  // that are mostly cancer reads with a cancer read coverage of < GSA1_MCT
+  // are not extracted.
+
+  static int GSA2_MCT;
+  // Blocks of suffixes covering the same genomic location in the second GSA
+  // that have a read coverage of < GSA2_MCT are not extracted.
+  // Consensus sequence positions generated from < GSA2_MCT reads are
+  // masked. Tumour consensus sequence positions with < GSA2_MCT reads
+  // supporting the chosen consensus base are masked.
+
+  static const int COVERAGE_UPPER_THRESHOLD;
+  // Blocks with a coverage > COVERAGE_UPPER_THRESHOLD are discarded.
+  static const int N_THREADS;
+  static const int MAX_LOW_CONFIDENCE_POS;
+  // Blocks with > MAX_LOW_CONFIDENCE_POS number of low confidence postions
+  // are discarded.
+  static const double ECONT;
+  static const double ALLELIC_FREQ_OF_ERROR;
+  // Aligned positions with > 1 base with a frequency above
+  // ALLELIC_FREQ_OF_ERROR are considered low confidence positions and masked.
 
   std::mutex cancer_extraction_lock;
   std::mutex cout_lock;
@@ -85,80 +84,163 @@ private:
   std::mutex buildConsensusPairLock;
 
   ReadPhredContainer *reads;
-  SuffixArray *SA;    // store a pointer to SA for access
+  SuffixArray *SA; 
   std::set<unsigned int> CancerExtraction;
-  std::vector<bpBlock> SeedBlocks;  // only contain tumour read subblock
+  // Elements are indicies of cancer specific reads extracted from the
+  // coloured GSA
+  std::vector<bpBlock> SeedBlocks;
+  // Elements are initial break point blocks, generated from 
+  // seedBreakPointBlocks(), each block consists of the the cancer specific
+  // reads covering single location.
+
   std::vector<bpBlock> BreakPointBlocks;
+  // Fully formed break point blocks. Consisting of a set of cancer
+  // specific reads covering a potential mutation, and the corresponding
+  // healthy reads that cover the same location, along with the relative alignment
+  // information, used to align each read against its own block.
+
   std::vector<consensus_pair> consensus_pairs;
-  
+  // Elements are consensus sequences generated from break point blocks.
+
   unsigned int backUpSearchStart(unsigned int seed_index);
+  // The worker threads that seed break point blocks from the second gsa
+  // may begin block generation from the middle of block. 
+  // backUpSearchStart() moves the start of block generation to the
+  // start of the block a thread may have landed in the middle of.
+
+  void extractCancerSpecificReads();
+  // Divides coloured GSA into even chunks and deploys threads
+  // with each thread computing extractGroupsWorker() over an allocated chunk.
+
+  void extractionWorker(unsigned int to, unsigned int from);
+  // Passes through allocated GSA chunk and extracts reads as cancer specific 
+  // reads if:
+  // -- Suffixes of cancer specific reads form a block that covers the
+  //    same genomic location, with the number of cancer reads >= GSA_MCT1
+  // -- The ratio of healthy / cancer reads in the block is <= ECONT
+
+  void seedBreakPointBlocks();
+  // Generates the seed break point blocks from the cancer specific reads
+  // in CancerExraction, storing result in SeedBlocks.
+  // The second GSA is firsly constructed. Again, RadixSA (Rajasekran, Nicolae
+  // 2014) is employed to generate a suffix array, which is then split
+  // into even chunks, each deployed on a thread and 
+  // transformed with transformBlock() into a second GSA chunk.
+  // extractGroups() then generates seed blocks from second GSA.
 
   void transformBlock(unsigned long long *from, unsigned long long *to,
                       std::vector< std::pair<unsigned int, unsigned int> > *bsa,
-                      std::vector<read_tag> *block);
+                      std::vector<read_tag> *the failed search
+                      // sequence are searched.
+  // Transforms a block of the suffix array elements into a block of the
+  // second GSA elements.
   
-  void extractCancerSpecificReads();
-
-  bool excessLowQuality(consensus_pair & pair);
-
-  bool groupSuffixes(int direction, int seedIndex, bpBlock &block, 
-      bool orienation, int calibration);
-
-  bool getSuffixesFromLeft(int seed_index, 
-                           bpBlock &block,
-                           bool orientation, int calibration);
-  
-  bool getSuffixesFromRight(int seed_index, 
-                           bpBlock &block, 
-                           bool orientation, int calibration);
-
-  void extractNonMutatedAlleles(bpBlock &block, consensus_pair &pair);
-
-  bool extendBlock(int seed_index, bpBlock 
-      &block, bool orientation, int calibration);
-
-  bool lexCompare(std::string const& l, std::string const& r, unsigned int min_lr);
-
-  int lcp(std::string const& l, std::string const& r, unsigned int mlr);
-
-  int minVal(int a, int b);
-
-  long long int binarySearch(std::string query); //O(n + nm)
-
-  void extractionWorker(unsigned int to, unsigned int from);
-
-  void buildConsensusPairsWorker(bpBlock* block, bpBlock* end);
-
-  void seedBreakPointBlocks();
-
   void extractGroups(std::vector<read_tag> const& gsa);
+  // Divides second GSA gsa into even chunks and deploys threads
+  // with each thread computing extractGroupsWorker() over an allocated chunk.
 
   void extractGroupsWorker(unsigned int seed_index, unsigned int to,
                            std::vector<read_tag> const* gsa_ptr);
+  // Passes through the allocated second GSA chunk extracting sets
+  // of reads (seed break point blocks), represented by read_tag if:
+  // -- Suffixes of reads cover same genomic location
+  // -- Number of reads in seed break point block is > GSA_MCT2
+
+  void buildConsensusPairsWorker(bpBlock* block, bpBlock* end);
+  // Builds consensus pairs out of an allocated group of seed break point
+  // blocks. 
+
+  void generateConsensusSequence(bool tissue, bpBlock const& block, int &
+      cns_offset, std::string & cns, std::string & qual);
+  // For a given break point block, function builds a consensus sequence,
+  // and quality string for tumour or healthy derived reads.
+  // And returns the alignment position of the consensus sequence (cns_offset)
 
   void buildQualityString(std::string & qual, std::vector<int> const&
-      freq_matrix, int width, std::string const& cns, bool tissue);
+      freq_matrix, std::string const& cns, bool tissue);
+  // Generates the consensus sequence quality string with various
+  // masking codes
+
+  void extractNonMutatedAlleles(bpBlock &block, consensus_pair &pair);
+  // Using the cancer consensus sequence extracts healthy reads 
+  // covering the same location and inserts them into the block.
+  // This is done by searching for a 30 character sequence of the consensus
+  // sequence and extracting healthy reads sharing the sequence
+  // If search fails, the two regions flanking of the failed search
+  // sequence are searched.
+
+  long long int binarySearch(std::string query);
+  // Binary search for query in coloured GSA, returns:
+  //  -- failed search: -1 
+  //  -- success: index of matching suffix
+
+  int lcp(std::string const& l, std::string const& r, unsigned int mlr);
+  // optimized lcp computer. Optimization: Starts search lcp count and comparison
+  // mlr and l[mlr],r[mlr] respectively. As characters at index < mlr in
+  // suffixes of the GSA will be identical
+
+  bool lexCompare(std::string const& l, std::string const& r, unsigned int min_lr);
+  // Performs an optimized comparison, with same optimization as lcp()
+
+  int minVal(int a, int b);
+
+  bool extendBlock(int seed_index, bpBlock 
+      &block, bool orientation, int calibration);
+  // seed_index, the location where binarSearch() found a match to 
+  // the query is used as the start point to gather healthy reads
+  // that also match the query towards the left and the right in the
+  // coloured GSA.
+  // Returns false if search failed to extract any healthy reads,
+  // true otherwise
+  bool getSuffixesFromLeft(int seed_index, 
+                           bpBlock &block,
+                           bool orientation, int calibration);
+  // called by extendBlock(). Returns false if failed to 
+  // extract any healthy reads, true otherwise
+  bool getSuffixesFromRight(int seed_index, 
+                           bpBlock &block, 
+                           bool orientation, int calibration);
+  // called by extendBlock(). Returns false if failed to 
+  // extract any healthy reads, true otherwise
+
+  bool excessLowQuality(consensus_pair & pair);
+  // Returns true if number of low quality positions is >
+  // MAX_LOW_CONFIDENCE_POS, false otherwise.
 
   int computeLCP(read_tag const& a, read_tag const& b);
+  // Computes the lcp between two read_tag suffixes, returning the lcp
+
+  int convertOffset(read_tag const& tag);
+  // converts alignment offset between forward and reverse orientation,
+  // returning the converted offset
+
+  void trimHealthyConsensus(consensus_pair & pair);
+  // Trims distal regions of the healthy consensus sequence
+  // up to the last consensus character that has a corresponding
+  // quality string value of 'T' or 'B', and succeeds a stretch
+  // of consensus characters that have a contigous stretch of 'T' or 'B'
+  // quality string values, starting from left and right ends.
+
+  void trimCancerConsensus(consensus_pair & pair);
+  // Trims the distal regions of the cancer consensus sequence,
+  // such that the ends of the cancer consensus sequence never extend
+  // beyond the healthy consensus sequence in the aligned pair.
+
+  void maskLowQualityPositions(consensus_pair & pair);
+  // In the aligned consensus pair, at a given aligned position,
+  // switches the cancer consensus sequence character 
+  // with the healthy consensus sequence character,
+  // if the character in either one of the quality strings at the aligned
+  // position is not '-'. 
+  
+  std::string addGaps(int ngaps);
+  // adds gaps preceeding a read to give aligned output.
+
+  std::string readTagToString(read_tag const& tag);
 
   void mergeBlocks(bpBlock & to, bpBlock & from);
 
   void unifyBlocks(std::vector<bpBlock> & seedBlocks);
-
-  int convertOffset(read_tag const& tag);
-
-  void trimHealthyConsensus(consensus_pair & pair);
-
-  void trimCancerConsensus(consensus_pair & pair);
-
-  void maskLowQualityPositions(consensus_pair & pair);
-
-  void generateConsensusSequence(bool tissue, bpBlock const& block, int &
-      cns_offset, std::string & cns, std::string & qual);
-  
-  std::string addGaps(int ngaps);
-
-  std::string readTagToString(read_tag const& tag);
 
 public:
   SNVIdentifier(SuffixArray &SA, 

@@ -1,4 +1,9 @@
-// SuffixArray.h
+/*
+SuffixArray.h
+Author: Izaak Coleman
+*/
+
+
 #ifndef SUFFIXARRAY_H
 #define SUFFIXARRAY_H
 
@@ -6,37 +11,61 @@
 #include <vector>
 #include <string>
 
-
 #include "Suffix_t.h"
 #include "Reads.h"
 
 class SuffixArray {
 private:
   const int N_THREADS;
-  const int MIN_SUFFIX;
+  const int MIN_SUFFIX_SIZE;
   ReadPhredContainer *reads;
-  std::vector<Suffix_t> SA;      // pointer to suffix array
- 
-  void parallelGenRadixSA(int min_suffix);
+  std::vector<Suffix_t> SA;
+
+  void constructColouredGSA(int min_suffix);
+  // Primary function call to generate GeDi's coloured Generalized Suffix Array.
+
+  void constructSuffixArray(unsigned long long **radixSA, 
+                             unsigned int *startOfTumour, 
+                             unsigned int *sizeOfRadixSA);
+  // Constructs a suffix array via RadixSA (Rajasekaran, Nicolae 2014).
+  // The input for RadixSA is a concatenation of all the reads in the
+  // data set. The first half of the concatenation consists of reads
+  // from the healthy data set, the second, reads from the cancer data set.
+  // The position in the concatenation where cancer reads begin is stored
+  // in startOfTumour.
+
+  void buildBinarySearchArrays(
+      std::vector<std::pair<unsigned int, unsigned int> > *healthyBSA, 
+      std::vector<std::pair<unsigned int, unsigned int> > *tumourBSA);
+  // Wrapper calling generateBSA() for tumour and healthy data sets
+  void generateBSA(std::vector<std::pair<unsigned int, unsigned int> > &BSA,
+                   bool type);
+  // Produces a sorted vector that is used for binary searches (binary
+  // search array). Elements are (r,c) tuples, of which there is one
+  // element per read in the binary search array, where:
+  // -- r = index of read in its container (either HealthyReads or TumourReads).
+  // -- c = index of read in the concatenation
+  // Rank of the tuples implies same rank for tuple fields: For all tuples in 
+  // the binary search array, if (r1,c1) < (r2,c2) then r1 < r2 and c1 < c2
 
   void transformSuffixArrayBlock(std::vector<Suffix_t> *block, 
       std::vector<std::pair<unsigned int, unsigned int> > *healthyBSA,
       std::vector<std::pair<unsigned int, unsigned int> > *tumourBSA,
       unsigned long long *radixSA, unsigned int from, 
       unsigned int to, unsigned int startOfTumour, int min_suf);
-
-  void buildBinarySearchArrays(
-      std::vector<std::pair<unsigned int, unsigned int> > *healthyBSA, 
-      std::vector<std::pair<unsigned int, unsigned int> > *tumourBSA);
-
-  void generateBSA(std::vector<std::pair<unsigned int, unsigned int> > &BSA,
-                   bool type);
-
-  void generateParallelRadix(unsigned long long **radixSA, 
-                             unsigned int *startOfTumour, 
-                             unsigned int *sizeOfRadixSA);
+  // Function transforms a suffix array element, an integer,
+  // into a coloured GSA element, a tuple of type Suffix_t.
+  // For a given suffix array element, the fields of the Suffix_t it is 
+  // transformed into are given by:
+  // -- Suffix_t::type: If the suffix array element is less or greater than
+  //    StartOfTumour
+  // -- Suffix_t::read_id = r from the (r,c) returned by a
+  //    SuffixArray:binarySearch() for the suffix array element
+  // -- Suffix_t::offset = (suffix array element - c) for the same (r,c) used
+  //    by Suffix_t::read_id. 
 
   std::string concatenateReads(bool type);
+  // Returns a concatenation of the reads in either HealthyReads or TumourReads.
 
 public:
   SuffixArray(ReadPhredContainer &reads, int min_suffix, int n_threads);
@@ -48,6 +77,9 @@ public:
   std::pair<unsigned int, unsigned int> 
   binarySearch(std::vector<std::pair<unsigned int,  unsigned int> > &BSA, 
                unsigned int suffix_index);
+  // Searches over a binary search array returning the (r,c) where
+  // c is less than suffix_index and there is no other (r,c) with a
+  // smaller for (suffix_index - c)
 };
 /*
   void buildGSAFile(std::vector<Suffix_t> &GSA, std::string filename);

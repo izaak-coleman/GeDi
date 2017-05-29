@@ -1,4 +1,8 @@
-// GenomeMapper.cpp
+/*
+GenomeMapper.cpp
+Author: Izaak Coleman
+*/
+
 
 #include <vector>
 #include <iostream>
@@ -102,7 +106,6 @@ void GenomeMapper::countSNVs(SamEntry &alignment, int ohang) {
 //START(GenomeMapper_countSNVs);
   string mutated = alignment.get<string>(SamEntry::HDR);
   string nonMutated = alignment.get<string>(SamEntry::SEQ);
-  // indel signature
   for(int i=0; i < mutated.size() - 1; i++) {
     if (mutated[i] != nonMutated[i + ohang] &&
         mutated[i+1] != nonMutated[i+1 + ohang]) {

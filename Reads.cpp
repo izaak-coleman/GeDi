@@ -1,4 +1,9 @@
-// Reads.cpp
+/*
+Reads.cpp
+Author: Izaak Coleman
+*/
+
+
 #include <string>
 #include <vector>
 #include <iostream>
@@ -100,17 +105,15 @@ void ReadPhredContainer::qualityProcessRawData(vector<fastq_t> *r_data,
 //START(ReadPhredContainer_qualityProcessRawData);
   processed_reads->reserve(to - from);
   processed_phreds->reserve(to - from);
-  // Search through string, first determining quality, then 
-  // removing substrings
   for(int i = from; i < to; i++) {
-    // link iterators to quality read of the next fastq elem
+    // Discard low quality reads
     double nLowQualBases = 0.0;
     for(auto it = (*r_data)[i].qual.begin(); it != (*r_data)[i].qual.end(); it++) {
       if (*it < PHRED_20) nLowQualBases++;
     }
     if ((nLowQualBases / (*r_data)[i].qual.size()) > QUALITY_THRESH) continue;
-
-    vector<string> read_substrs;  // remove N chars
+    // Remove 'N' chars
+    vector<string> read_substrs;
     vector<string> phred_substrs;
     int left_arrow{0}, right_arrow{0};
     while((right_arrow = (*r_data)[i].seq.find(REMOVED_TOKENS, left_arrow)) != string::npos) {
@@ -124,10 +127,10 @@ void ReadPhredContainer::qualityProcessRawData(vector<fastq_t> *r_data,
     }
     read_substrs.push_back((*r_data)[i].seq.substr(left_arrow));
     phred_substrs.push_back((*r_data)[i].qual.substr(left_arrow));
-
+    // Load data and store length of longest read
     for (int i=0; i < read_substrs.size(); i++) {
-      if(read_substrs[i].length() >= MIN_SUFFIX_SIZE /*- TERM_CHAR_CORRECTION */) {
-        if (read_substrs[i].length() > maxLen) {   // determine longest read
+      if(read_substrs[i].length() >= MIN_SUFFIX_SIZE ) {
+        if (read_substrs[i].length() > maxLen) { 
           maxLen = read_substrs[i].length();
         }
         processed_reads->push_back(read_substrs[i] + TERM_CHAR);
@@ -145,8 +148,6 @@ unsigned int ReadPhredContainer::maxLengthRead() {
 }
 string::iterator ReadPhredContainer::returnStartIterator(Suffix_t &suf) {
 //START(ReadPhredContainer_returnStartIterator);
-  // Use suf.type and suf.read_id to locate the read, and then set an iterator
-  // pointing at suf.offset dist from begining
   if(suf.type == HEALTHY) { 
     if (suf.read_id >= HealthyReads.size() || suf.read_id < 0) {
       cout << "returnStartIterator() out of bounds " << endl;
@@ -166,8 +167,6 @@ string::iterator ReadPhredContainer::returnStartIterator(Suffix_t &suf) {
 
 string::iterator ReadPhredContainer::returnEndIterator(Suffix_t &suf) {
 //START(ReadPhredContainer_returnEndIterator);
-  // Use suf.type and suf.read_id to locate the read, then return an iterator to the 
-  // end of that read
   if (suf.type == HEALTHY) {
     if (suf.read_id >= HealthyReads.size() || suf.read_id < 0) {
       cout << "returnEndIterator() out of bounds " << endl;
@@ -187,7 +186,6 @@ string::iterator ReadPhredContainer::returnEndIterator(Suffix_t &suf) {
 
 string ReadPhredContainer::returnSuffix(Suffix_t &suf){
 //START(ReadPhredContainer_returnSuffix);
-  // return the string assoc. with suf
   if (suf.type == HEALTHY) {
     if (suf.read_id >= HealthyReads.size() || suf.read_id < 0) {
       cout << "returnSuffix() out of bounds " << endl;

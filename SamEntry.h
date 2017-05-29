@@ -1,3 +1,9 @@
+/*
+SamEntry.h
+Author: Izaak Coleman
+*/
+
+
 #ifndef SAMENTRY_H
 #define SAMENTRY_H
 
@@ -47,7 +53,6 @@ public:
 
   SamEntry(std::string const& line); 
   template <typename RT>
-    // RETURN BY CONST REF
   RT get(int key) {
     try {
       return boost::any_cast<RT> (fields[key]);
@@ -58,6 +63,8 @@ public:
                 << "you tried to access an absent key." << std::endl;
     }
   }
+  // Primary SamEntry object interface function. Returns
+  // fields from the same files (values) stored in the heterogenious map
   template <typename T>
   void set(int key, T value) {
     try {
@@ -65,17 +72,21 @@ public:
     }
     catch (...) {
       std::cout << "exception occured\n"
-                << "likely tried to access an abscent key." << std::endl;
+                << "likely tried to access an absent key." << std::endl;
     }
   }
+  // Set the value of a field
 
-  int snvLocSize();
+  int snvLocSize(); // number of SNVs identified in the sam entry
 
   int snvLocation(int idx);
+  // returns the location of an SNV 
 
   void snv_push_back(int v);
 
   bool containsIndel(); 
+  // returns true if CIGAR string contains 'I' or 'D', false otherwise.
+
 private:
   std::vector<int> SNVLocations;
   unsigned int pair_id;
