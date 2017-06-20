@@ -86,10 +86,15 @@ public:
 
   bool containsIndel(); 
   // returns true if CIGAR string contains 'I' or 'D', false otherwise.
+  void free();
+  // frees memory allocated to fields and SNVLocations
 
+  bool deleted();
+  // Returns true if free() was called on object, false otherwise
 private:
   std::vector<int> SNVLocations;
   unsigned int pair_id;
+  bool del;
   std::map<int, boost::any> fields;
 
   std::string startsWith(std::string const& tok, std::vector<std::string> const&

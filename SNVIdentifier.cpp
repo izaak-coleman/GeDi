@@ -60,12 +60,13 @@ SNVIdentifier::SNVIdentifier(SuffixArray &_SA,
   // Group blocks covering same mutations in both orientations
   cout << "Seeding breakpoint blocks by constructing GSA2..." << endl;
   seedBreakPointBlocks();
+  CancerExtraction.clear();
   cout << "Number of seed blocks: " << SeedBlocks.size() << endl;
   cout << "<<<<<<<<<<<<<<building consensus pairs " << endl;
 
   unsigned int elementsPerThread = SeedBlocks.size() / N_THREADS;
-  bpBlock* from = &SeedBlocks[0];
-  bpBlock* to   = (&SeedBlocks[0] + elementsPerThread);
+  bpBlock** from = &SeedBlocks[0];
+  bpBlock** to   = (&SeedBlocks[0] + elementsPerThread);
   vector<thread> w;
   for (int i = 0; i < N_THREADS; i++) {
     w.push_back(
@@ -76,28 +77,34 @@ SNVIdentifier::SNVIdentifier(SuffixArray &_SA,
     else to += elementsPerThread;
   }
   for (auto& t : w) t.join();
+  reads->free();
+  SA->free();
   cout << "<<<<<<<<<<<<<<Finished break point block construction" << endl;
 //COMP(SNVIdentifier_SNVIdentifier);
 }
 
-void SNVIdentifier::buildConsensusPairsWorker(bpBlock* block, bpBlock* end){
+void SNVIdentifier::buildConsensusPairsWorker(bpBlock** block, bpBlock** end){
 //START(SNVIdentifier_buildConsensusPairsWorker);
  vector<consensus_pair> localThreadStore;
   for(; block < end; block++) {
+    if ((*block)->size() > COVERAGE_UPPER_THRESHOLD) {
+      delete *block;
+      *block = nullptr;
+      continue;
+    }
     consensus_pair pair;
     pair.left_ohang = pair.right_ohang = 0;
-    generateConsensusSequence(TUMOUR, *block, pair.mut_offset, pair.mutated, pair.mqual);
-    if (block->size() > COVERAGE_UPPER_THRESHOLD) {
-      block->clear();
+    generateConsensusSequence(TUMOUR, **block, pair.mut_offset, pair.mutated, pair.mqual);
+
+    extractNonMutatedAlleles(**block, pair);
+    if ((*block)->size() > COVERAGE_UPPER_THRESHOLD) {
+      delete *block;
+      *block = nullptr;
       continue;
     }
-    extractNonMutatedAlleles(*block, pair);
-    generateConsensusSequence(HEALTHY, *block, pair.nmut_offset, pair.non_mutated, pair.nqual);
-    if (block->size() > COVERAGE_UPPER_THRESHOLD) {
-      block->clear();
-      continue;
-    }
-    block->clear();
+    generateConsensusSequence(HEALTHY, **block, pair.nmut_offset, pair.non_mutated, pair.nqual);
+    delete *block;
+    *block = nullptr;
     if (excessLowQuality(pair)) {
       continue;
     }
@@ -114,6 +121,10 @@ void SNVIdentifier::buildConsensusPairsWorker(bpBlock* block, bpBlock* end){
     consensus_pairs.push_back(p);
   }
 //COMP(SNVIdentifier_buildConsensusPairsWorker);
+}
+
+void SNVIdentifier::free() {
+  consensus_pairs.clear();
 }
 
 bool SNVIdentifier::excessLowQuality(consensus_pair & pair) {
@@ -575,7 +586,7 @@ void SNVIdentifier::extractGroupsWorker(unsigned int seedIndex,
                                             unsigned int to,
                                             vector<read_tag> const* gsa_ptr) {
 //START(SNVIdentifier_extractGroupsWorker);
-  vector<bpBlock> localThreadStore;
+  vector<bpBlock*> localThreadStore;
   vector<read_tag> const& gsa = *gsa_ptr;
   // backup to block start
   if (seedIndex !=  0) {
@@ -587,13 +598,14 @@ void SNVIdentifier::extractGroupsWorker(unsigned int seedIndex,
   }
   unsigned int extension{seedIndex + 1};
   while (seedIndex < to && seedIndex != gsa.size() - 1) {
-    bpBlock block;
+    bpBlock * block;
     while (computeLCP(gsa[seedIndex], gsa[extension]) >= reads->getMinSuffixSize()) {
       extension++;
       if (extension == gsa.size()) break;
     }
     if (extension - seedIndex >= GSA2_MCT) {
-      for (int i = seedIndex; i < extension; i++) block.insert(gsa[i]);
+      block = new bpBlock;
+      for (int i = seedIndex; i < extension; i++) block->insert(gsa[i]);
     } else {
       seedIndex = extension++;
       continue;
@@ -602,8 +614,8 @@ void SNVIdentifier::extractGroupsWorker(unsigned int seedIndex,
     seedIndex = extension++;
   }
   if (seedIndex == gsa.size() - 1 && GSA2_MCT == 1) {
-    bpBlock block;
-    block.insert(gsa[seedIndex]);
+    bpBlock *block = new bpBlock;
+    block->insert(gsa[seedIndex]);
     localThreadStore.push_back(block);
   }
   std::lock_guard<std::mutex> lock(extractGroupsWorkerLock);

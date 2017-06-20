@@ -262,6 +262,13 @@ int ReadPhredContainer::getMinSuffixSize() {
   return MIN_SUFFIX_SIZE;
 }
 
+void ReadPhredContainer::free() {
+  HealthyReads.clear();
+  HealthyPhreds.clear();
+  TumourReads.clear();
+  TumourPhreds.clear();
+}
+
 // end of file
 /*
 

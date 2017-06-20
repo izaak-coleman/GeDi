@@ -51,30 +51,30 @@ using bpBlock = std::set<read_tag, read_tag_compare>;
 
 class SNVIdentifier {
 private:
-  static const char MIN_PHRED_QUAL;
+  const char MIN_PHRED_QUAL;
   // Read characters with a phred score < MIN_PHRED_QUAL will not contribute to 
   // the consensus sequence.
 
-  static const int GSA1_MCT;
+  const int GSA1_MCT;
   // Blocks of suffixes covering the same genomic location in the coloured GSA,
   // that are mostly cancer reads with a cancer read coverage of < GSA1_MCT
   // are not extracted.
 
-  static int GSA2_MCT;
+  int GSA2_MCT;
   // Blocks of suffixes covering the same genomic location in the second GSA
   // that have a read coverage of < GSA2_MCT are not extracted.
   // Consensus sequence positions generated from < GSA2_MCT reads are
   // masked. Tumour consensus sequence positions with < GSA2_MCT reads
   // supporting the chosen consensus base are masked.
 
-  static const int COVERAGE_UPPER_THRESHOLD;
+  const int COVERAGE_UPPER_THRESHOLD;
   // Blocks with a coverage > COVERAGE_UPPER_THRESHOLD are discarded.
-  static const int N_THREADS;
-  static const int MAX_LOW_CONFIDENCE_POS;
+  const int N_THREADS;
+  const int MAX_LOW_CONFIDENCE_POS;
   // Blocks with > MAX_LOW_CONFIDENCE_POS number of low confidence postions
   // are discarded.
-  static const double ECONT;
-  static const double ALLELIC_FREQ_OF_ERROR;
+  const double ECONT;
+  const double ALLELIC_FREQ_OF_ERROR;
   // Aligned positions with > 1 base with a frequency above
   // ALLELIC_FREQ_OF_ERROR are considered low confidence positions and masked.
 
@@ -88,7 +88,7 @@ private:
   std::set<unsigned int> CancerExtraction;
   // Elements are indicies of cancer specific reads extracted from the
   // coloured GSA
-  std::vector<bpBlock> SeedBlocks;
+  std::vector<bpBlock*> SeedBlocks;
   // Elements are initial break point blocks, generated from 
   // seedBreakPointBlocks(), each block consists of the the cancer specific
   // reads covering single location.
@@ -130,8 +130,7 @@ private:
 
   void transformBlock(unsigned long long *from, unsigned long long *to,
                       std::vector< std::pair<unsigned int, unsigned int> > *bsa,
-                      std::vector<read_tag> *the failed search
-                      // sequence are searched.
+                      std::vector<read_tag> * block);
   // Transforms a block of the suffix array elements into a block of the
   // second GSA elements.
   
@@ -146,7 +145,7 @@ private:
   // -- Suffixes of reads cover same genomic location
   // -- Number of reads in seed break point block is > GSA_MCT2
 
-  void buildConsensusPairsWorker(bpBlock* block, bpBlock* end);
+  void buildConsensusPairsWorker(bpBlock** block, bpBlock** end);
   // Builds consensus pairs out of an allocated group of seed break point
   // blocks. 
 
@@ -251,10 +250,10 @@ public:
                     double econt, double allelic_freq_of_error);
 
   unsigned int getSize();
-
   consensus_pair & getPair(int i);
-
   int cnsPairSize();
+  void free();
+  // Deallocates memosy allocated for consensus_pairs
 
 };
 

@@ -85,6 +85,13 @@ public:
   unsigned int maxLengthRead();
 
   int getMinSuffixSize();
+
+  void free();
+  // Function deallocates the memory allocated for containers:
+  // - HealthyReads
+  // - HealthyPhreds
+  // - TumourReads
+  // - TumourPhreds
 };
 #endif
 /*

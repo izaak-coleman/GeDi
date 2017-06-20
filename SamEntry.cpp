@@ -55,6 +55,7 @@ SamEntry::SamEntry(string const& entry) {
 //START(SamEntry_SamEntry);
   vector<string> split_result;
   split_string(entry, "\t", split_result);
+  del = false;
 
 try {
     string header = split_result[0];  // load header for later parsing
@@ -131,6 +132,16 @@ bool SamEntry::containsIndel() {
     return true;
   }
   return false;
+}
+
+void SamEntry::free() {
+  del = true;
+  SNVLocations.clear();
+  fields.clear();
+}
+
+bool SamEntry::deleted() {
+  return del;
 }
 
 /*

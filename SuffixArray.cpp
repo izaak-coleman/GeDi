@@ -192,6 +192,10 @@ unsigned int SuffixArray::getSize() {
   return SA.size();
 }
 
+void SuffixArray::free() {
+  SA.clear();
+}
+
 // End of file
 
 /*

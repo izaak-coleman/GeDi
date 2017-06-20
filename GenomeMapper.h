@@ -19,12 +19,11 @@ Author: Izaak Coleman
 // SamEntry, each SNV is stored as a single_snv along with
 // relevant information from the SamEntry.
 struct single_snv {
- int flag;
  std::string chr;
  int position;
  char mutation_base;
  char healthy_base;
- unsigned int pair_id;
+ //unsigned int pair_id;  REMOVE!!
 };
 
 class GenomeMapper {
@@ -34,11 +33,11 @@ private:
   SNVIdentifier *snvId;     
   ReadPhredContainer *reads;
 
-  void identifySNVs(std::vector<SamEntry> &alignments);
+  void identifySNVs(std::vector<SamEntry*> &alignments);
   // Calls countSNVs() for all valid SamEntries, translating the
   // consensus sequence complementarity to that of the reference genome.
 
-  void countSNVs(SamEntry &alignment, int left);
+  void countSNVs(SamEntry* &alignment, int left);
   // Compares consensus sequences identifying SNVs.
 
   void constructSNVFastqData(std::string const& fastqName);
@@ -51,13 +50,13 @@ private:
   // +
   // DummyQualityString (!)'s of length HealthyConsensusSequence
 
-  void parseSamFile(std::vector<SamEntry> &alignments, std::string filename);
+  void parseSamFile(std::vector<SamEntry*> &alignments, std::string filename);
   // Builds list of SamEntries from sam file
 
   static bool compareSNVLocations(const single_snv &a, const single_snv &b);
   // Comparison logic for single_snv data type.
 
-  void outputSNVToUser(std::vector<SamEntry> &alignments, std::string reportFilename);
+  void outputSNVToUser(std::vector<SamEntry*> &alignments, std::string reportFilename);
   // Reports the list of SNVs
 
 public:

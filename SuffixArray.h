@@ -80,6 +80,9 @@ public:
   // Searches over a binary search array returning the (r,c) where
   // c is less than suffix_index and there is no other (r,c) with a
   // smaller for (suffix_index - c)
+
+  void free();
+  // Deallocated memory allocated for SA
 };
 /*
   void buildGSAFile(std::vector<Suffix_t> &GSA, std::string filename);
