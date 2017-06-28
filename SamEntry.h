@@ -15,69 +15,54 @@ Author: Izaak Coleman
 
 class SamEntry {
 public:
-  // Sam compulsory fields
-  static const int HDR;  // <int, string> K, V
-  static const int FLAG;  // <int, int> K, V
-  static const int RNAME;  // <int, string> K, V
-  static const int POS;  // <int, int> K, V
-  static const int MAPQ;  // <int, int> K, V
-  static const int CIGAR;  // <int, string> K, V
-  static const int RNEXT;  // <int, string> K, V
-  static const int PNEXT;  // <int, string> K, V
-  static const int TLEN;  // <int, string> K, V
-  static const int SEQ;  // <int, string> K, V
-  static const int QUAL; // <int, string> K, V
+  // SAM FIELDS
+  // ints
+  int flag;
+  int mapq;
+  int pos;
+  int pnext;
+  int tlen;
+  int left_ohang;
+  int right_ohang;
 
-  // Sam optional fields
-  static const int NM;    // <int, string> K, V 
-  static const int MD;    // <int, string> K, V 
-  static const int AS;    // <int, string> K, V 
-  static const int BC;    // <int, string> K, V 
-  static const int X0;    // <int, string> K, V 
-  static const int X1;    // <int, string> K, V 
-  static const int XN;    // <int, string> K, V 
-  static const int XM;    // <int, string> K, V 
-  static const int XO;    // <int, string> K, V 
-  static const int XG;    // <int, string> K, V 
-  static const int XT;    // <int, string> K, V 
-  static const int XA;    // <int, string> K, V 
-  static const int XS;    // <int, string> K, V 
-  static const int XF;    // <int, string> K, V 
-  static const int XE;    // <int, string> K, V 
+  // strings 
+  std::string hdr;
+  std::string rname;
+  std::string cigar;
+  std::string rnext;
+  std::string seq;
+  std::string qual;
 
-  // GeDi-specific fields
-  static const int LEFT_OHANG;   // <int, int> K,V
-  static const int RIGHT_OHANG;  // <int, int> K, V
-  static const int BLOCK_ID;     // <int, int> K, V
+  // SNV index
+  std::vector<int> SNVLocations;
+
+  // delete switch
+  bool del;
+
+  // keys
+  static const int HDR;  
+  static const int FLAG;
+  static const int RNAME;
+  static const int POS;
+  static const int MAPQ;
+  static const int CIGAR;
+  static const int RNEXT;
+  static const int PNEXT;
+  static const int TLEN;
+  static const int SEQ;
+  static const int QUAL;
+  static const int LEFT_OHANG;
+  static const int RIGHT_OHANG;
+  static const int BLOCK_ID;
 
 
   SamEntry(std::string const& line); 
-  template <typename RT>
-  RT get(int key) {
-    try {
-      return boost::any_cast<RT> (fields[key]);
-    }
-    catch(...) {
-      std::cout << "exception occured" << std::endl
-                << "likely a cast to incorrect type, or\n"
-                << "you tried to access an absent key." << std::endl;
-    }
-  }
-  // Primary SamEntry object interface function. Returns
-  // fields from the same files (values) stored in the heterogenious map
-  template <typename T>
-  void set(int key, T value) {
-    try {
-      fields[key] = value;
-    }
-    catch (...) {
-      std::cout << "exception occured\n"
-                << "likely tried to access an absent key." << std::endl;
-    }
-  }
-  // Set the value of a field
+  // Separates fields, discards any non compulsory fields. 
 
-  int snvLocSize(); // number of SNVs identified in the sam entry
+
+
+  int snvLocSize(); 
+  // number of SNVs identified in the sam entry
 
   int snvLocation(int idx);
   // returns the location of an SNV 
@@ -86,21 +71,34 @@ public:
 
   bool containsIndel(); 
   // returns true if CIGAR string contains 'I' or 'D', false otherwise.
+
   void free();
-  // frees memory allocated to fields and SNVLocations
+  // frees memory allocated to string fields and SNVLocations
 
   bool deleted();
   // Returns true if free() was called on object, false otherwise
-private:
-  std::vector<int> SNVLocations;
-  unsigned int pair_id;
-  bool del;
-  std::map<int, boost::any> fields;
 
-  std::string startsWith(std::string const& tok, std::vector<std::string> const&
-      fields);
+  void set(int k, int v) {
+    switch (k) {
+      case 1:  flag        = v; break;
+      case 3:  pos         = v; break;
+      case 4:  mapq        = v; break;
+      case 7:  pnext       = v; break;
+      case 8:  tlen        = v; break;
+      case 11: left_ohang  = v; break;
+      case 12: right_ohang = v; break;
+    }
+
+  }
+  void set(int k, std::string const& v) {
+    switch (k) {
+      case 0:  hdr   = v; break;
+      case 2:  rname = v; break;
+      case 5:  cigar = v; break;
+      case 6:  rnext = v; break;
+      case 9:  seq   = v; break;
+      case 10: qual  = v; break;
+    }
+  }
 };
 #endif
-/*
-  void setSNVLocation(int idx, int val);
-*/

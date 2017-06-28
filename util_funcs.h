@@ -14,6 +14,7 @@ Author: Izaak Coleman
 #include "Suffix_t.h"
 
 class ReadPhredContainer; // Forward decl. for use of returnStart/EndIterator()
+
 enum {TUMOUR, HEALTHY, SWITCHED}; // Data type
 enum {LEFT, RIGHT}; // Orientation in memory
 static const int MIN_SUFFIX = 30;
@@ -38,4 +39,5 @@ struct consensus_pair {
   int left_ohang;           // 0 index calibration after trimming
   int right_ohang;
 };
+
 #endif

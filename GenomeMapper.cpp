@@ -11,11 +11,16 @@ Author: Izaak Coleman
 #include <cstdlib>
 #include <boost/regex.hpp>
 
+// COMPUTE RSS
+#include <sys/time.h>
+#include <sys/resource.h>
+
 #include "GenomeMapper.h"
 #include "SNVIdentifier.h"
 #include "Reads.h"
 #include "util_funcs.h"
 #include "SamEntry.h"
+#include "SamEntryGet.h"
 #include "benchmark.h"
 
 using namespace std;
@@ -49,10 +54,24 @@ GenomeMapper::GenomeMapper(SNVIdentifier &snv,
   system(command_aln.c_str());
   vector<SamEntry*> alignments;
   cout << "Parsing sam" << endl;
+
+  struct rusage rss;
+  getrusage(RUSAGE_SELF, &rss);
+  cout << "RSS before parseSamFile()" << rss.ru_maxrss << endl;
+
   parseSamFile(alignments, samName);
+  getrusage(RUSAGE_SELF, &rss);
+  cout << "RSS after parseSamFile()" << rss.ru_maxrss << endl;
+
   cout << "Identifying SNV" << endl;
   identifySNVs(alignments);
+
+  getrusage(RUSAGE_SELF, &rss);
+  cout << "RSS after identifyingSNVs()" << rss.ru_maxrss << endl;
+
   outputSNVToUser(alignments, outName);
+  getrusage(RUSAGE_SELF, &rss);
+  cout << "RSS after outputSNVToUser()" << rss.ru_maxrss << endl;
 //COMP(GenomeMapper_GenomeMapper);  
 }
 
@@ -80,12 +99,12 @@ void GenomeMapper::parseSamFile(vector<SamEntry*> &alignments, string filename) 
   while(getline(snvSam, line)) {
     if (boost::regex_match(line, rgx_header)) continue;
     SamEntry * entry = new SamEntry(line); 
-    if (entry->get<string>(SamEntry::RNAME) != CHR) {
+    if (get<string>(SamEntry::RNAME, entry) != CHR) {
       delete entry;
       entry = nullptr;
       continue;
     } 
-    if(entry->get<int>(SamEntry::MAPQ) < MIN_MAPQ) { // MAPQ filter
+    if(get<int>(SamEntry::MAPQ, entry) < MIN_MAPQ) { // MAPQ filter
       delete entry;
       entry = nullptr;
       continue;
@@ -100,12 +119,12 @@ void GenomeMapper::parseSamFile(vector<SamEntry*> &alignments, string filename) 
 void GenomeMapper::identifySNVs(vector<SamEntry*> &alignments) {
 //START(GenomeMapper_identifySNVs);
   for (SamEntry* &entry : alignments) {
-    if(entry->get<int>(SamEntry::FLAG) == FORWARD_FLAG) {
-      countSNVs(entry, entry->get<int>(SamEntry::LEFT_OHANG));
+    if(get<int>(SamEntry::FLAG, entry) == FORWARD_FLAG) {
+      countSNVs(entry, get<int>(SamEntry::LEFT_OHANG, entry));
     }
-    else if (entry->get<int>(SamEntry::FLAG) == REVERSE_FLAG) {
-      entry->set(SamEntry::HDR, reverseComplementString(entry->get<string>(SamEntry::HDR))); 
-      countSNVs(entry, entry->get<int>(SamEntry::RIGHT_OHANG)); // invert overhangs due to rev comp
+    else if (get<int>(SamEntry::FLAG, entry) == REVERSE_FLAG) {
+      entry->set(SamEntry::HDR, reverseComplementString(get<string>(SamEntry::HDR, entry))); 
+      countSNVs(entry, get<int>(SamEntry::RIGHT_OHANG, entry)); // invert overhangs due to rev comp
     }
   }
 //COMP(GenomeMapper_identifySNVs);
@@ -113,8 +132,8 @@ void GenomeMapper::identifySNVs(vector<SamEntry*> &alignments) {
 
 void GenomeMapper::countSNVs(SamEntry * &alignment, int ohang) {
 //START(GenomeMapper_countSNVs);
-  string mutated = alignment->get<string>(SamEntry::HDR);
-  string nonMutated = alignment->get<string>(SamEntry::SEQ);
+  string mutated = get<string>(SamEntry::HDR, alignment);
+  string nonMutated = get<string>(SamEntry::SEQ, alignment);
   bool noSNVs = true;
   for(int i=0; i < mutated.size() - 1; i++) {
     if (mutated[i] != nonMutated[i + ohang] &&
@@ -166,19 +185,18 @@ void GenomeMapper::outputSNVToUser(vector<SamEntry*> &alignments, string outName
     for(int i=0; i < entry->snvLocSize(); i++) {
       int snv_index = entry->snvLocation(i);
       int overhang = 0;
-      if (entry->get<int>(SamEntry::FLAG) == FORWARD_FLAG) {
-        overhang = entry->get<int>(SamEntry::LEFT_OHANG);
+      if (get<int>(SamEntry::FLAG, entry) == FORWARD_FLAG) {
+        overhang = get<int>(SamEntry::LEFT_OHANG, entry);
       }
-      else if (entry->get<int>(SamEntry::FLAG) == REVERSE_FLAG) {
-        overhang = entry->get<int>(SamEntry::RIGHT_OHANG);
+      else if (get<int>(SamEntry::FLAG, entry) == REVERSE_FLAG) {
+        overhang = get<int>(SamEntry::RIGHT_OHANG, entry);
       }
 
       single_snv snv;
-      snv.chr = entry->get<string>(SamEntry::RNAME);
-      snv.position = (entry->get<int>(SamEntry::POS) + snv_index + overhang); // location of snv
-      snv.healthy_base = entry->get<string>(SamEntry::SEQ)[snv_index + overhang];
-      snv.mutation_base = entry->get<string>(SamEntry::HDR)[snv_index];
-      //snv.pair_id = entry.get<int>(SamEntry::BLOCK_ID);
+      snv.chr = get<string>(SamEntry::RNAME, entry);
+      snv.position = (get<int>(SamEntry::POS, entry) + snv_index + overhang); // location of snv
+      snv.healthy_base = get<string>(SamEntry::SEQ, entry)[snv_index + overhang];
+      snv.mutation_base = get<string>(SamEntry::HDR, entry)[snv_index];
       separate_snvs.push_back(snv);
     }
     delete entry;
