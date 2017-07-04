@@ -56,6 +56,9 @@ private:
   static bool compareSNVLocations(const single_snv &a, const single_snv &b);
   // Comparison logic for single_snv data type.
 
+  static bool equalSNVs(single_snv const& a, single_snv const& b);
+  // Returns true of two single_snv's have equivalent fields
+
   void outputSNVToUser(std::vector<SamEntry*> &alignments, std::string reportFilename);
   // Reports the list of SNVs
 

@@ -49,6 +49,54 @@ struct read_tag_compare{
 
 using bpBlock = std::set<read_tag, read_tag_compare>;
 
+struct bpBlockCompare{
+  bool operator() (bpBlock const * const a, bpBlock const * const b) {
+    bpBlock::iterator a_it = a->begin();
+    bpBlock::iterator b_it = b->begin();
+    read_tag_compare comp;
+    for(; a_it != a->end() && b_it != b->end(); a_it++, b_it++) {
+      if(comp(*a_it, *b_it)) { // a < b, return true
+        return true;
+      }
+      else if (comp(*b_it, *a_it)) { // b < a, return false
+        return false;
+      }
+      // else, continue
+    }
+    // same elements, compare sizes
+    if (a_it == a->end() && b_it == b->end()) { // a == b, return false
+      return false;
+    }
+    else if (a_it == a->end()) { // a at end, b not, a < b, return true
+      return true;
+    }
+    else  { // b at end, a not, a < b is false, return false
+      return false;
+    }
+  }
+};
+
+struct equalTumourRT {
+  bool operator() (read_tag const& a, read_tag const& b) {
+    return a.read_id == b.read_id;
+  }
+};
+
+
+struct bpBlockEqual {
+  bool operator() (bpBlock const * const a, bpBlock const * const b) {
+    // first check sizes
+    if (a->size() != b->size()) return false;
+    // check elems
+    equalTumourRT equal;
+    for(bpBlock::iterator a_it = a->end(), b_it = b->end();
+        a_it != a->end(); a_it++, b_it++) {
+      if (!equal(*a_it,*b_it)) return false;
+    }
+    return true;
+  }
+};
+
 class SNVIdentifier {
 private:
   const char MIN_PHRED_QUAL;
@@ -69,7 +117,7 @@ private:
 
   const int COVERAGE_UPPER_THRESHOLD;
   // Blocks with a coverage > COVERAGE_UPPER_THRESHOLD are discarded.
-  const int N_THREADS;
+  int N_THREADS;
   const int MAX_LOW_CONFIDENCE_POS;
   // Blocks with > MAX_LOW_CONFIDENCE_POS number of low confidence postions
   // are discarded.
@@ -240,6 +288,8 @@ private:
   void mergeBlocks(bpBlock & to, bpBlock & from);
 
   void unifyBlocks(std::vector<bpBlock> & seedBlocks);
+
+  void printAlignedBlock(bpBlock block);
 
 public:
   SNVIdentifier(SuffixArray &SA, 

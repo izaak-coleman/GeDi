@@ -49,7 +49,7 @@ GenomeMapper::GenomeMapper(SNVIdentifier &snv,
   constructSNVFastqData(fastqName);
   snvId->free();
   cout << "Aligning consensus pairs with Bowtie2" << endl;
-  string command_aln("./bowtie2-2.3.1/bowtie2 -p 16 -x " + bwt_idx + " -U " +
+  string command_aln("~/GeDi/bowtie2-2.3.1/bowtie2 -p 16 -x " + bwt_idx + " -U " +
                      fastqName + " -S " + samName);
   system(command_aln.c_str());
   vector<SamEntry*> alignments;
@@ -175,6 +175,13 @@ bool GenomeMapper::compareSNVLocations(const single_snv &a, const single_snv &b)
   return a.position < b.position;
 }
 
+bool GenomeMapper::equalSNVs(single_snv const& a, single_snv const& b) {
+  return (a.position == b.position) &&
+         (a.healthy_base == b.healthy_base) &&
+         (a.mutation_base == b.mutation_base) &&
+         (a.chr == b.chr);
+}
+
 void GenomeMapper::outputSNVToUser(vector<SamEntry*> &alignments, string outName) {
 //START(GenomeMapper_outputSNVToUser);
   vector<single_snv> separate_snvs;
@@ -204,6 +211,8 @@ void GenomeMapper::outputSNVToUser(vector<SamEntry*> &alignments, string outName
   }
   // sort the snvs 
   std::sort(separate_snvs.begin(), separate_snvs.end(), compareSNVLocations);
+  auto last = std::unique(separate_snvs.begin(), separate_snvs.end(), &equalSNVs);
+  separate_snvs.erase(last, separate_snvs.end());
   
   ofstream report(outName);
   report << "Mut_ID\tType\tChr\tPos\tNormal_NT\tTumor_NT\n";
