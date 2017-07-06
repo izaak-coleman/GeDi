@@ -24,6 +24,7 @@ public:
   int tlen;
   int left_ohang;
   int right_ohang;
+  int id;
 
   // strings 
   std::string hdr;
@@ -54,6 +55,7 @@ public:
   static const int LEFT_OHANG;
   static const int RIGHT_OHANG;
   static const int BLOCK_ID;
+  static const int ID;
 
 
   SamEntry(std::string const& line); 

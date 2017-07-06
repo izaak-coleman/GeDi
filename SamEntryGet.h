@@ -23,6 +23,7 @@ int get<int>(int k, SamEntry const * s) {
     case 8:  return s->tlen;
     case 11: return s->left_ohang;
     case 12: return s->right_ohang;
+    case 13: return s->id;
   }
 }
 // string spec.

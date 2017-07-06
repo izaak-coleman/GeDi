@@ -86,6 +86,11 @@ SNVIdentifier::SNVIdentifier(SuffixArray &_SA,
   reads->free();
   SA->free();
   cout << "<<<<<<<<<<<<<<Finished break point block construction" << endl;
+  int id = 0;
+  for (consensus_pair &p : consensus_pairs) {
+    p.id = id;
+    id++;
+  }
 //COMP(SNVIdentifier_SNVIdentifier);
 }
 
@@ -101,7 +106,6 @@ void SNVIdentifier::printAlignedBlock(bpBlock block) {
       max = tag.offset;
     }
   }
-
 
   cout << "TUMOUR subblock " << endl;
   for (read_tag tag : block) {
@@ -158,6 +162,11 @@ void SNVIdentifier::buildConsensusPairsWorker(bpBlock** block, bpBlock** end){
     consensus_pair pair;
     pair.left_ohang = pair.right_ohang = 0;
     generateConsensusSequence(TUMOUR, **block, pair.mut_offset, pair.mutated, pair.mqual);
+    //if(pair.mutated.empty()) {
+    //  delete *block;
+    //  *block = nullptr;
+    //  continue;
+    //}
 
     extractNonMutatedAlleles(**block, pair);
     //printAlignedBlock(**block);
@@ -221,6 +230,8 @@ void SNVIdentifier::trimCancerConsensus(consensus_pair & pair) {
     pair.mqual.erase(0, pair.mut_offset - pair.nmut_offset);
   }
   else if (pair.mut_offset < pair.nmut_offset) {
+//    pair.non_mutated.erase(0, pair.nmut_offset - pair.mut_offset); // com
+//    pair.nqual.erase(0, pair.nmut_offset - pair.mut_offset);  //com
     pair.left_ohang = pair.nmut_offset - pair.mut_offset;
   }
   if (pair.mutated.size() > (pair.non_mutated.size() - pair.left_ohang)) {
@@ -229,6 +240,9 @@ void SNVIdentifier::trimCancerConsensus(consensus_pair & pair) {
     pair.mqual.erase(pair.mqual.size() - dist, dist);
   }
   else if (pair.mutated.size() < (pair.non_mutated.size() - pair.left_ohang)) {
+//    int dist = pair.non_mutated.size() - pair.mutated.size(); // com
+//    pair.non_mutated.erase(pair.non_mutated.size() - dist, dist);// com
+//    pair.nqual.erase(pair.nqual.size() - dist, dist); // com
     pair.right_ohang = (pair.non_mutated.size() - pair.left_ohang) - pair.mutated.size();
   }
 //COMP(SNVIdentifier_trimCancerConsensus);
@@ -287,24 +301,7 @@ void SNVIdentifier::extractNonMutatedAlleles(bpBlock &block,
   }
   if (!(success_left || success_right)) {
     // then perform flanking search
-    for (int i = 0; i <= pair.mutated.size() - reads->getMinSuffixSize(); i++){
-      query = pair.mutated.substr(i, reads->getMinSuffixSize());
-      rcquery = reverseComplementString(query);
-      fwd_idx = binarySearch(query);
-      rev_idx = binarySearch(rcquery);
-      if (fwd_idx != -1) {
-        extendBlock(fwd_idx, block, RIGHT, pair.mut_offset - i);
-      }
-      if (rev_idx != -1) {
-        extendBlock(rev_idx, block, LEFT, pair.mut_offset - i);
-      }
-    }
-    //for (int i = pair.mut_offset - reads->getMinSuffixSize();
-    //    i <= pair.mut_offset + reads->getMinSuffixSize();
-    //    i += reads->getMinSuffixSize() * 2) { // * 2 skips center search
-    //  if (i < 0 || i > pair.mutated.size() - reads->getMinSuffixSize()) {
-    //    continue;
-    //  }
+    //for (int i = 0; i <= pair.mutated.size() - reads->getMinSuffixSize(); i++){
     //  query = pair.mutated.substr(i, reads->getMinSuffixSize());
     //  rcquery = reverseComplementString(query);
     //  fwd_idx = binarySearch(query);
@@ -316,6 +313,23 @@ void SNVIdentifier::extractNonMutatedAlleles(bpBlock &block,
     //    extendBlock(rev_idx, block, LEFT, pair.mut_offset - i);
     //  }
     //}
+    for (int i = pair.mut_offset - reads->getMinSuffixSize();
+        i <= pair.mut_offset + reads->getMinSuffixSize();
+        i += reads->getMinSuffixSize() * 2) { // * 2 skips center search
+      if (i < 0 || i > pair.mutated.size() - reads->getMinSuffixSize()) {
+        continue;
+      }
+      query = pair.mutated.substr(i, reads->getMinSuffixSize());
+      rcquery = reverseComplementString(query);
+      fwd_idx = binarySearch(query);
+      rev_idx = binarySearch(rcquery);
+      if (fwd_idx != -1) {
+        extendBlock(fwd_idx, block, RIGHT, pair.mut_offset - i);
+      }
+      if (rev_idx != -1) {
+        extendBlock(rev_idx, block, LEFT, pair.mut_offset - i);
+      }
+    }
   }
 //COMP(SNVIdentifier_extractNonMutatedAlleles);
 }
@@ -384,6 +398,13 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
       delete phred;
     }
   }
+
+  //for (int i = 0; i < width; i++) {
+  //  if (!(cnsCount[i*4] || cnsCount[i*4+1] || cnsCount[i*4+2] || cnsCount[i*4+3])) {
+  //    return;
+  //  }
+  //}
+
   //COMP(computecnsCount);
   //START(computeCNS);
   for (int pos=0; pos < width; pos++) {

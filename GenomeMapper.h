@@ -23,7 +23,7 @@ struct single_snv {
  int position;
  char mutation_base;
  char healthy_base;
- //unsigned int pair_id;  REMOVE!!
+ int pair_id;//  REMOVE!!
 };
 
 class GenomeMapper {

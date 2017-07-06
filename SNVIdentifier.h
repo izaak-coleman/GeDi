@@ -89,7 +89,7 @@ struct bpBlockEqual {
     if (a->size() != b->size()) return false;
     // check elems
     equalTumourRT equal;
-    for(bpBlock::iterator a_it = a->end(), b_it = b->end();
+    for(bpBlock::iterator a_it = a->begin(), b_it = b->begin();
         a_it != a->end(); a_it++, b_it++) {
       if (!equal(*a_it,*b_it)) return false;
     }

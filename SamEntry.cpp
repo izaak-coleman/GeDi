@@ -29,6 +29,7 @@ const int SamEntry::QUAL  = 10;
 // GeDi FIELDS
 const int SamEntry::LEFT_OHANG = 11;
 const int SamEntry::RIGHT_OHANG = 12;
+const int SamEntry::ID = 13;
 
 SamEntry::SamEntry(string const& entry) {
   vector<string> fields;
@@ -60,6 +61,7 @@ SamEntry::SamEntry(string const& entry) {
   split_string(fields[SamEntry::HDR], ";", header_subs);
   left_ohang = stoi(header_subs[0]);
   right_ohang = stoi(header_subs[1]);
+  id = stoi(header_subs[2]);
 }
 
 void SamEntry::snv_push_back(int v) {

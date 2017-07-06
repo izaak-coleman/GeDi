@@ -84,7 +84,7 @@ void GenomeMapper::constructSNVFastqData(string const& fastqName) {
     string qual(cns_pair.non_mutated.size(), '!'); 
     snv_fq << "@" + cns_pair.mutated + "[" + to_string(cns_pair.left_ohang) + 
               ";" + to_string(cns_pair.right_ohang) + ";" + 
-              to_string(000) + "]\n" + cns_pair.non_mutated 
+              to_string(cns_pair.id) + "]\n" + cns_pair.non_mutated 
               + "\n+\n" + qual + "\n";
   }
   snv_fq.close();
@@ -204,6 +204,7 @@ void GenomeMapper::outputSNVToUser(vector<SamEntry*> &alignments, string outName
       snv.position = (get<int>(SamEntry::POS, entry) + snv_index + overhang); // location of snv
       snv.healthy_base = get<string>(SamEntry::SEQ, entry)[snv_index + overhang];
       snv.mutation_base = get<string>(SamEntry::HDR, entry)[snv_index];
+      snv.pair_id = get<int>(SamEntry::ID, entry);
       separate_snvs.push_back(snv);
     }
     delete entry;
@@ -211,8 +212,8 @@ void GenomeMapper::outputSNVToUser(vector<SamEntry*> &alignments, string outName
   }
   // sort the snvs 
   std::sort(separate_snvs.begin(), separate_snvs.end(), compareSNVLocations);
-  auto last = std::unique(separate_snvs.begin(), separate_snvs.end(), &equalSNVs);
-  separate_snvs.erase(last, separate_snvs.end());
+  //auto last = std::unique(separate_snvs.begin(), separate_snvs.end(), &equalSNVs);
+  //separate_snvs.erase(last, separate_snvs.end());
   
   ofstream report(outName);
   report << "Mut_ID\tType\tChr\tPos\tNormal_NT\tTumor_NT\n";
@@ -221,7 +222,8 @@ void GenomeMapper::outputSNVToUser(vector<SamEntry*> &alignments, string outName
     report << i << "\t" << "SNV\t" << snv.chr << "\t"
            << snv.position << "\t"
            << snv.healthy_base << "\t" 
-           << snv.mutation_base
+           << snv.mutation_base << "\t"
+           << snv.pair_id 
            << "\n";
     i++;
   }
