@@ -240,6 +240,10 @@ int main(int argc, char** argv)
       return ERROR_IN_COMMAND_LINE; 
     } 
     // Run GeDi
+    struct rusage rss;
+    getrusage(RUSAGE_SELF, &rss);
+    cout << "RSS START" << rss.ru_maxrss << endl;
+    START(GeDi);
     ReadPhredContainer  reads(vm["input_files"].as<string>());
 
     SuffixArray SA(reads, reads.getMinSuffixSize(), vm["n_threads"].as<int>());
@@ -260,6 +264,9 @@ int main(int argc, char** argv)
                         vm["chromosome"].as<string>(),
                         vm["bt2-idx"].as<string>(),
                         vm["min_mapq"].as<int>());
+    COMP(GeDi);
+    getrusage(RUSAGE_SELF, &rss);
+    cout << "RSS FINISH" << rss.ru_maxrss << endl;
     return SUCCESS;
   } 
   catch(std::exception& e) 

@@ -38,7 +38,6 @@ struct consensus_pair {
   int nmut_offset;
   int left_ohang;           // 0 index calibration after trimming
   int right_ohang;
-  int id;
 };
 
 #endif

@@ -23,9 +23,9 @@ Author: Izaak Coleman
 // derive from the same genomic locations.
 struct read_tag{
   unsigned int read_id;
-  mutable int offset;
+  mutable int16_t offset;
   mutable bool orientation;
-  int tissue_type;
+  unsigned char tissue_type;
 };
 
 struct read_tag_compare{
@@ -49,11 +49,22 @@ struct read_tag_compare{
 
 using bpBlock = std::set<read_tag, read_tag_compare>;
 
+struct tumourRTCompare{
+  bool operator() (const read_tag &a, const read_tag &b) {
+    if (a.read_id != b.read_id) {
+      return a.read_id < b.read_id;
+    }
+    else {
+      return a.offset < b.offset;
+    }
+  }
+};
+
 struct bpBlockCompare{
   bool operator() (bpBlock const * const a, bpBlock const * const b) {
     bpBlock::iterator a_it = a->begin();
     bpBlock::iterator b_it = b->begin();
-    read_tag_compare comp;
+    tumourRTCompare comp;
     for(; a_it != a->end() && b_it != b->end(); a_it++, b_it++) {
       if(comp(*a_it, *b_it)) { // a < b, return true
         return true;
@@ -197,8 +208,8 @@ private:
   // Builds consensus pairs out of an allocated group of seed break point
   // blocks. 
 
-  void generateConsensusSequence(bool tissue, bpBlock const& block, int &
-      cns_offset, std::string & cns, std::string & qual);
+  void generateConsensusSequence(bool tissue, bpBlock const& block,
+      int & cns_offset, std::string & cns, std::string & qual);
   // For a given break point block, function builds a consensus sequence,
   // and quality string for tumour or healthy derived reads.
   // And returns the alignment position of the consensus sequence (cns_offset)
@@ -280,16 +291,12 @@ private:
   // if the character in either one of the quality strings at the aligned
   // position is not '-'. 
   
-  std::string addGaps(int ngaps);
-  // adds gaps preceeding a read to give aligned output.
-
   std::string readTagToString(read_tag const& tag);
 
   void mergeBlocks(bpBlock & to, bpBlock & from);
 
   void unifyBlocks(std::vector<bpBlock> & seedBlocks);
 
-  void printAlignedBlock(bpBlock block);
 
 public:
   SNVIdentifier(SuffixArray &SA, 
@@ -312,6 +319,10 @@ public:
 
 #endif
 /*
+  std::string addGaps(int ngaps);
+  // adds gaps preceeding a read to give aligned output.
+
+  void printAlignedBlock(bpBlock block);
   bool generateConsensusSequence(unsigned int block_id, int &cns_offset, 
       bool tissue_type, unsigned int &pair_id,
       std::string &cns, std::string & qual);

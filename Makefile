@@ -1,7 +1,7 @@
 OBJ=main.o util_funcs.o SuffixArray.o SNVIdentifier.o Reads.o GenomeMapper.o SamEntry.o
 EXE=GeDi
 CXX=g++
-COMPFLAGS=-Wall -ggdb -MMD -pthread -std=c++11
+COMPFLAGS=-Wall -ggdb -MMD -pthread -std=c++11 -O2
 OBJDIR=./objects/
 
 $(EXE):$(OBJ)
