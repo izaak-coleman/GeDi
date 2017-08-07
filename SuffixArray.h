@@ -1,4 +1,5 @@
 /*
+
 SuffixArray.h
 Author: Izaak Coleman
 */

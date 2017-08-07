@@ -10,7 +10,6 @@ Author: Izaak Coleman
 #include <fstream>
 #include <utility>
 #include <cstring>
-#include <thread>
 
 #include <zlib.h>
 #include "kseq.h"

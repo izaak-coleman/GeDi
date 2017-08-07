@@ -9,14 +9,14 @@ Author: Izaak Coleman
 #include <vector>
 #include <sstream>
 #include <fstream>
+#include <omp.h> // openmp parallelism
 
-// for use of radixSA
 #include <sys/types.h>
 #include <cstdlib>
 #include <cstring>
 #include <unistd.h>
 #include <algorithm>
-#include <thread>
+
 
 #include "radix.h"
 #include "Suffix_t.h"
@@ -29,63 +29,66 @@ using namespace std;
 
 SuffixArray::SuffixArray(ReadPhredContainer &reads, int m, int n):
 N_THREADS(n), MIN_SUFFIX_SIZE(m) {
-//START(SuffixArray_SuffixArray);
   cout << "MIN SUFFIX " <<  MIN_SUFFIX_SIZE << endl;
   this->reads = &reads;
   cout << "Starting constructColouredGSA:" << endl;
   constructColouredGSA(MIN_SUFFIX_SIZE);
   cout << "GSA1 size: " << SA.size() << endl;
-//COMP(SuffixArray_SuffixArray);
 }
 
 void SuffixArray::constructColouredGSA(int min_suffix) {
-//START(SuffixArray_constructColouredGSA);
-  vector<thread> BSA_and_SA;
   unsigned long long *radixSA;   // Pointer to suffix array
   unsigned int startOfTumour;
   unsigned int radixSASize;
   cout << "Making SA" << endl;
   vector<pair<unsigned int, unsigned int> > healthyBSA;
   vector<pair<unsigned int, unsigned int> > tumourBSA;
-  BSA_and_SA.push_back(
-      std::thread(&SuffixArray::buildBinarySearchArrays, this, 
-        &healthyBSA, &tumourBSA)
-  );
-  BSA_and_SA.push_back(
-      std::thread(&SuffixArray::constructSuffixArray, this, 
-        &radixSA, &startOfTumour, &radixSASize)
-  );
+#pragma omp parallel 
+{
+  #pragma omp sections 
+  {
+    #pragma omp section
+      buildBinarySearchArrays(&healthyBSA, &tumourBSA);
+    #pragma omp section
+      constructSuffixArray(&radixSA, &startOfTumour, &radixSASize);
+  }
+}
   // Transform to coloured GSA
-  for(auto & t : BSA_and_SA) t.join();
   cout << "radix sa size " << radixSASize << endl;
   cout << "Making GSA" << endl;
-  vector<thread> workers;
-  vector<vector<Suffix_t>> arrayBlocks(N_THREADS, vector<Suffix_t>());
-  // Divide work roughly evenly between deployed threads
+
+
+  // requires user spec. number of threads.
+  omp_set_num_threads(N_THREADS);
+  // Each thread will transform into a local thread results block
+  vector<vector<Suffix_t>> threadResult (N_THREADS, vector<Suffix_t>());
   unsigned int elementsPerThread = (radixSASize/N_THREADS);
-  unsigned int from{0}, to {elementsPerThread};
-  for(unsigned int i = 0; i < N_THREADS; i++) {
-    workers.push_back(
-    std::thread(&SuffixArray::transformSuffixArrayBlock, this, &arrayBlocks[i], 
-        &healthyBSA, &tumourBSA, radixSA, from, to, startOfTumour, min_suffix)
-    );
-    from = to;
-    if(i == N_THREADS - 2) {
+
+#pragma omp parallel for
+  for (int i = 0; i < N_THREADS; i++) {
+    // Find block bounds
+    int from = i*elementsPerThread, to;
+    if (i ==  N_THREADS - 1) {
       to = radixSASize;
     }
     else {
-      to += elementsPerThread;
+      to = (i+1)*elementsPerThread;
     }
+    // transform SA -> GSA
+    transformSuffixArrayBlock(&threadResult[i],
+                              &healthyBSA, 
+                              &tumourBSA, 
+                              radixSA, 
+                              from,
+                              to,
+                              startOfTumour,
+                              min_suffix);
   }
-  for(auto &thread : workers) thread.join();
-  // Copy transformed elements to GSA
   delete radixSA;
-  for(vector<Suffix_t> & b : arrayBlocks) {
+  for (vector<Suffix_t> & b : threadResult) {
     SA.insert(SA.end(), b.begin(), b.end());
     b.clear();
   }
-  SA.shrink_to_fit();
-//COMP(SuffixArray_constructColouredGSA);
 }
 
 void SuffixArray::transformSuffixArrayBlock(vector<Suffix_t> *block, 

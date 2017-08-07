@@ -12,7 +12,6 @@ Author: Izaak Coleman
 #include <iostream>
 #include <set>
 #include <utility>
-#include <mutex>
 
 #include "util_funcs.h"
 #include "Suffix_t.h"
@@ -137,11 +136,6 @@ private:
   // Aligned positions with > 1 base with a frequency above
   // ALLELIC_FREQ_OF_ERROR are considered low confidence positions and masked.
 
-  std::mutex cancer_extraction_lock;
-  std::mutex cout_lock;
-  std::mutex extractGroupsWorkerLock;
-  std::mutex buildConsensusPairLock;
-
   ReadPhredContainer *reads;
   SuffixArray *SA; 
   std::set<unsigned int> CancerExtraction;
@@ -171,7 +165,8 @@ private:
   // Divides coloured GSA into even chunks and deploys threads
   // with each thread computing extractGroupsWorker() over an allocated chunk.
 
-  void extractionWorker(unsigned int to, unsigned int from);
+  void extractionWorker(unsigned int to, unsigned int from, std::set<unsigned
+      int> & threadExtr);
   // Passes through allocated GSA chunk and extracts reads as cancer specific 
   // reads if:
   // -- Suffixes of cancer specific reads form a block that covers the
@@ -198,13 +193,15 @@ private:
   // with each thread computing extractGroupsWorker() over an allocated chunk.
 
   void extractGroupsWorker(unsigned int seed_index, unsigned int to,
-                           std::vector<read_tag> const* gsa_ptr);
+                           std::vector<read_tag> const* gsa_ptr,
+                           std::vector<bpBlock*> & localThreadStore);
   // Passes through the allocated second GSA chunk extracting sets
   // of reads (seed break point blocks), represented by read_tag if:
   // -- Suffixes of reads cover same genomic location
   // -- Number of reads in seed break point block is > GSA_MCT2
 
-  void buildConsensusPairsWorker(bpBlock** block, bpBlock** end);
+  void buildConsensusPairsWorker(bpBlock** block, bpBlock** end,
+      std::vector<consensus_pair> & localThreadStore);
   // Builds consensus pairs out of an allocated group of seed break point
   // blocks. 
 

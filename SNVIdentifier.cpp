@@ -17,11 +17,11 @@ Author: Izaak Coleman
 #include <iterator>
 #include <map>
 #include <limits>
-#include <thread>
-#include <mutex>
 #include <cstdlib> // exit
 #include <functional>
 #include <algorithm>
+
+#include <omp.h>
 
 #include "radix.h"
 #include "util_funcs.h"
@@ -68,33 +68,44 @@ SNVIdentifier::SNVIdentifier(SuffixArray &_SA,
   cout << "Number of seed blocks: " << SeedBlocks.size() << endl;
   cout << "<<<<<<<<<<<<<<building consensus pairs " << endl;
 
+  unsigned int elementsPerThread;
+  int n_threads;
   if (SeedBlocks.size() < N_THREADS) {
-    N_THREADS = 1;
+    omp_set_num_threads(1);
+    n_threads = 1;
+    elementsPerThread = SeedBlocks.size();
+  } else {
+    omp_set_num_threads(N_THREADS);
+    n_threads = N_THREADS;
+    elementsPerThread = SeedBlocks.size() / n_threads;
   }
 
-  unsigned int elementsPerThread = SeedBlocks.size() / N_THREADS;
-  bpBlock** from = &SeedBlocks[0];
-  bpBlock** to   = (&SeedBlocks[0] + elementsPerThread);
-
-  vector<thread> w;
-  for (int i = 0; i < N_THREADS; i++) {
-    w.push_back(
-      std::thread(&SNVIdentifier::buildConsensusPairsWorker, this, from,to)
-    );
-    from = to;
-    if (i == N_THREADS - 2) to = (&SeedBlocks[0] + SeedBlocks.size());
-    else to += elementsPerThread;
+#pragma omp parallel for 
+  for (int i = 0; i < n_threads; i++) {
+    bpBlock** from = (&SeedBlocks[0] + i*elementsPerThread);
+    bpBlock** to;
+    if (i == n_threads - 1) {
+      to = (&SeedBlocks[0] + SeedBlocks.size());
+    } else {
+      to = (&SeedBlocks[0] + (i+1)*elementsPerThread);
+    }
+    vector<consensus_pair> threadWork;
+    buildConsensusPairsWorker(from, to, threadWork);
+#pragma omp critical 
+    {
+      consensus_pairs.insert(consensus_pairs.end(), threadWork.begin(), threadWork.end());
+      threadWork.clear();
+    }
   }
-  for (auto& t : w) t.join();
   reads->free();
   SA->free();
   cout << "<<<<<<<<<<<<<<Finished break point block construction" << endl;
 //COMP(SNVIdentifier_SNVIdentifier);
 }
 
-void SNVIdentifier::buildConsensusPairsWorker(bpBlock** block, bpBlock** end){
+void SNVIdentifier::buildConsensusPairsWorker(bpBlock** block, bpBlock** end,
+    vector<consensus_pair> & localThreadStore) {
 //START(SNVIdentifier_buildConsensusPairsWorker);
-  vector<consensus_pair> localThreadStore;
   for(; block < end; block++) {
     if ((*block)->size() > COVERAGE_UPPER_THRESHOLD) {
       delete *block;
@@ -125,11 +136,6 @@ void SNVIdentifier::buildConsensusPairsWorker(bpBlock** block, bpBlock** end){
     }
     localThreadStore.push_back(pair);
   }
-  std::lock_guard<std::mutex> lock(buildConsensusPairLock);
-  for (consensus_pair const& p : localThreadStore) {
-    consensus_pairs.push_back(p);
-  }
-//COMP(SNVIdentifier_buildConsensusPairsWorker);
 }
 
 void SNVIdentifier::free() {
@@ -380,18 +386,25 @@ void SNVIdentifier::buildQualityString(string & qual, vector<int> const& freq_ma
 
 void SNVIdentifier::extractCancerSpecificReads() {
 //START(SNVIdentifier_extractCancerSpecificReads);
-  unsigned int elementsPerThread = (SA->getSize()  / N_THREADS);
-  vector<thread> w;
-  unsigned int from = 0, to = elementsPerThread;
-  for(int i=0; i < N_THREADS; i++) {
-    w.push_back(
-      std::thread(&SNVIdentifier::extractionWorker, this, from, to)
-    );
-    from = to;
-    if(i == N_THREADS - 2) to = SA->getSize();
-    else to += elementsPerThread;
+  omp_set_num_threads(N_THREADS);
+  unsigned int elementsPerThread = (SA->getSize() / N_THREADS);
+#pragma omp parallel for
+  for (int i=0; i < N_THREADS; i++) {
+    int from = i*elementsPerThread;
+    int to;
+    if (i == N_THREADS - 1) {
+      to = SA->getSize();
+    } else {
+      to = (i+1)*elementsPerThread;
+    }
+    set<unsigned int> threadWork;
+    extractionWorker(from, to, threadWork);
+#pragma omp critical
+    {
+      CancerExtraction.insert(threadWork.begin(), threadWork.end());
+      threadWork.clear();
+    }
   }
-  for(auto &t: w) t.join();
 //COMP(SNVIdentifier_extractCancerSpecificReads);
 }
 
@@ -410,9 +423,9 @@ unsigned int SNVIdentifier::backUpSearchStart(unsigned int seedIndex) {
 //COMP(SNVIdentifier_backUpSearchStart);
 }
 
-void SNVIdentifier::extractionWorker(unsigned int seed_index, unsigned int to) {
+void SNVIdentifier::extractionWorker(unsigned int seed_index, unsigned int to,
+    set<unsigned int> & threadExtr) {
 //START(SNVIdentifier_extractionWorker);
-  set<unsigned int> threadExtr;
   seed_index = backUpSearchStart(seed_index);
   unsigned int extension {seed_index + 1};
   while (seed_index < to && seed_index != SA->getSize() - 1) {   // CONFIRM EFFECT OF THIS
@@ -455,11 +468,6 @@ void SNVIdentifier::extractionWorker(unsigned int seed_index, unsigned int to) {
       threadExtr.insert(SA->getElem(seed_index).read_id);
     }
   }
-  // Load to CancerExtraction, avoiding thread interference
-  std::lock_guard<std::mutex> lock(cancer_extraction_lock);
-  for(unsigned int extracted_cancer_read : threadExtr) {
-      CancerExtraction.insert(extracted_cancer_read);
-  }
 //COMP(SNVIdentifier_extractionWorker);
 }
 
@@ -491,32 +499,32 @@ void SNVIdentifier::seedBreakPointBlocks() {
     Radix<unsigned long long>((uchar*) concat.c_str(), concat.size()).build();
   cout << "Size of cancer specific sa: " << concat.size() << endl;
   cout << "Transforming to cancer specfic gsa" << endl;
-  vector<thread> workers;
-  vector< vector<read_tag> > arrayBlocks(N_THREADS, vector<read_tag>());
+
+  omp_set_num_threads(N_THREADS);
   unsigned int elementsPerThread = concat.size() / N_THREADS;
-  unsigned int from{0};
-  unsigned int to{elementsPerThread};
-  for (unsigned int i=0; i < N_THREADS; i++) {
-    workers.push_back(
-        std::thread(&SNVIdentifier::transformBlock, this, 
-                    (radixSA + from), (radixSA + to),
-                    &bsa, &arrayBlocks[i])
-    );
-    from = to;
-    if (i == N_THREADS - 2) to = concat.size();
-    else to += elementsPerThread;
+  vector< vector<read_tag> > threadWorkArray(N_THREADS, vector<read_tag>());
+#pragma omp parallel for 
+  for (int i=0; i < N_THREADS; i++) {
+    unsigned int from = i*elementsPerThread;
+    unsigned int to;
+    if (i == N_THREADS - 1) {
+      to = concat.size();
+    } else {
+      to = (i+1)*elementsPerThread;
+    }
+    transformBlock((radixSA + from), (radixSA + to), &bsa, &threadWorkArray[i]);
   }
-  for (auto &t: workers) t.join();
   delete radixSA;
   vector<read_tag> gsa;
   int gsaSz = 0;
-  for (vector<read_tag> const& b : arrayBlocks) gsaSz += b.size();
+  for (vector<read_tag> const & tw : threadWorkArray) gsaSz += tw.size();
   gsa.reserve(gsaSz);
-  for (vector<read_tag> & b : arrayBlocks) {
-    gsa.insert(gsa.end(), b.begin(), b.end());
-    b.clear();
+  for (vector<read_tag> & tw : threadWorkArray) {
+    gsa.insert(gsa.end(), tw.begin(), tw.end());
+    tw.clear();
   }
   gsa.shrink_to_fit();
+
   cout << "GSA2 size: " << gsa.size()<< endl;
   struct rusage rss;
   getrusage(RUSAGE_SELF, &rss);
@@ -590,27 +598,30 @@ int SNVIdentifier::computeLCP(read_tag const& a, read_tag const& b) {
 
 void SNVIdentifier::extractGroups(vector<read_tag> const& gsa) {
 //START(SNVIdentifier_extractGroups);
+  omp_set_num_threads(N_THREADS);
   unsigned int elementsPerThread = gsa.size() / N_THREADS;
-  vector<thread> workers;
-  unsigned int from{0}, to{elementsPerThread};
+#pragma omp parallel for
   for (int i=0; i < N_THREADS; i++) {
-    workers.push_back(
-    std::thread(&SNVIdentifier::extractGroupsWorker, this, from, to,
-      &gsa)
-    );
-    from = to;
-    if (i == N_THREADS - 2) to = gsa.size();
-    else to += elementsPerThread;
+    int from = i*elementsPerThread;
+    int to;
+    if (i == N_THREADS - 1) {
+      to = gsa.size();
+    } else {
+      to  = (i+1)*elementsPerThread;
+    }
+    vector<bpBlock*> threadWork;
+    extractGroupsWorker(from, to, &gsa, threadWork);
+#pragma omp critical
+    SeedBlocks.insert(SeedBlocks.end(), threadWork.begin(), threadWork.end());
   }
-  for (auto &t : workers) t.join();
 //COMP(SNVIdentifier_extractGroups);
 }
 
 void SNVIdentifier::extractGroupsWorker(unsigned int seedIndex,
                                             unsigned int to,
-                                            vector<read_tag> const* gsa_ptr) {
+                                            vector<read_tag> const* gsa_ptr,
+                                            vector<bpBlock*> & localThreadStore) {
 //START(SNVIdentifier_extractGroupsWorker);
-  vector<bpBlock*> localThreadStore;
   vector<read_tag> const& gsa = *gsa_ptr;
   // backup to block start
   if (seedIndex !=  0) {
@@ -642,8 +653,6 @@ void SNVIdentifier::extractGroupsWorker(unsigned int seedIndex,
     block->insert(gsa[seedIndex]);
     localThreadStore.push_back(block);
   }
-  std::lock_guard<std::mutex> lock(extractGroupsWorkerLock);
-  SeedBlocks.insert(SeedBlocks.end(), localThreadStore.begin(), localThreadStore.end());
 //COMP(SNVIdentifier_extractGroupsWorker);
 }
 
