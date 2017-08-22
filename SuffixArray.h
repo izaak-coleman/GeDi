@@ -25,9 +25,9 @@ private:
   void constructColouredGSA(int min_suffix);
   // Primary function call to generate GeDi's coloured Generalized Suffix Array.
 
-  void constructSuffixArray(unsigned long long **radixSA, 
-                             unsigned int *startOfTumour, 
-                             unsigned int *sizeOfRadixSA);
+  void constructSuffixArray(int64_t * &dSA, 
+                             int64_t *startOfTumour, 
+                             int64_t *sizeOfRadixSA);
   // Constructs a suffix array via RadixSA (Rajasekaran, Nicolae 2014).
   // The input for RadixSA is a concatenation of all the reads in the
   // data set. The first half of the concatenation consists of reads
@@ -36,10 +36,10 @@ private:
   // in startOfTumour.
 
   void buildBinarySearchArrays(
-      std::vector<std::pair<unsigned int, unsigned int> > *healthyBSA, 
-      std::vector<std::pair<unsigned int, unsigned int> > *tumourBSA);
+      std::vector<std::pair<unsigned int, int64_t> > *healthyBSA, 
+      std::vector<std::pair<unsigned int, int64_t> > *tumourBSA);
   // Wrapper calling generateBSA() for tumour and healthy data sets
-  void generateBSA(std::vector<std::pair<unsigned int, unsigned int> > &BSA,
+  void generateBSA(std::vector<std::pair<unsigned int, int64_t> > &BSA,
                    bool type);
   // Produces a sorted vector that is used for binary searches (binary
   // search array). Elements are (r,c) tuples, of which there is one
@@ -50,10 +50,10 @@ private:
   // the binary search array, if (r1,c1) < (r2,c2) then r1 < r2 and c1 < c2
 
   void transformSuffixArrayBlock(std::vector<Suffix_t> *block, 
-      std::vector<std::pair<unsigned int, unsigned int> > *healthyBSA,
-      std::vector<std::pair<unsigned int, unsigned int> > *tumourBSA,
-      unsigned long long *radixSA, unsigned int from, 
-      unsigned int to, unsigned int startOfTumour, int min_suf);
+      std::vector<std::pair<unsigned int, int64_t> > *healthyBSA,
+      std::vector<std::pair<unsigned int, int64_t> > *tumourBSA,
+      int64_t *SA, int64_t from, 
+      int64_t to, int64_t startOfTumour, int min_suf);
   // Function transforms a suffix array element, an integer,
   // into a coloured GSA element, a tuple of type Suffix_t.
   // For a given suffix array element, the fields of the Suffix_t it is 
@@ -75,8 +75,8 @@ public:
 
   unsigned int getSize();
 
-  std::pair<unsigned int, unsigned int> 
-  binarySearch(std::vector<std::pair<unsigned int,  unsigned int> > &BSA, 
+  std::pair<unsigned int, int64_t> 
+  binarySearch(std::vector<std::pair<unsigned int,  int64_t> > &BSA, 
                unsigned int suffix_index);
   // Searches over a binary search array returning the (r,c) where
   // c is less than suffix_index and there is no other (r,c) with a

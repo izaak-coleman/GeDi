@@ -18,12 +18,13 @@ Author: Izaak Coleman
 #include <algorithm>
 
 
-#include "radix.h"
 #include "Suffix_t.h"
 #include "util_funcs.h"
 #include "SuffixArray.h"
 #include "Reads.h"
 #include "benchmark.h"
+
+#include "divsufsort64.h"
 
 using namespace std;
 
@@ -37,12 +38,12 @@ N_THREADS(n), MIN_SUFFIX_SIZE(m) {
 }
 
 void SuffixArray::constructColouredGSA(int min_suffix) {
-  unsigned long long *radixSA;   // Pointer to suffix array
-  unsigned int startOfTumour;
-  unsigned int radixSASize;
+  int64_t *dSA; // divsufsort64 suffix array
+  int64_t startOfTumour;
+  int64_t radixSASize;
   cout << "Making SA" << endl;
-  vector<pair<unsigned int, unsigned int> > healthyBSA;
-  vector<pair<unsigned int, unsigned int> > tumourBSA;
+  vector<pair<unsigned int, int64_t> > healthyBSA;
+  vector<pair<unsigned int, int64_t> > tumourBSA;
 #pragma omp parallel 
 {
   #pragma omp sections 
@@ -50,7 +51,7 @@ void SuffixArray::constructColouredGSA(int min_suffix) {
     #pragma omp section
       buildBinarySearchArrays(&healthyBSA, &tumourBSA);
     #pragma omp section
-      constructSuffixArray(&radixSA, &startOfTumour, &radixSASize);
+      constructSuffixArray(dSA, &startOfTumour, &radixSASize);
   }
 }
   // Transform to coloured GSA
@@ -62,12 +63,12 @@ void SuffixArray::constructColouredGSA(int min_suffix) {
   omp_set_num_threads(N_THREADS);
   // Each thread will transform into a local thread results block
   vector<vector<Suffix_t>> threadResult (N_THREADS, vector<Suffix_t>());
-  unsigned int elementsPerThread = (radixSASize/N_THREADS);
+  int64_t elementsPerThread = (radixSASize/N_THREADS);
 
 #pragma omp parallel for
   for (int i = 0; i < N_THREADS; i++) {
     // Find block bounds
-    int from = i*elementsPerThread, to;
+    int64_t from = i*elementsPerThread, to;
     if (i ==  N_THREADS - 1) {
       to = radixSASize;
     }
@@ -78,13 +79,13 @@ void SuffixArray::constructColouredGSA(int min_suffix) {
     transformSuffixArrayBlock(&threadResult[i],
                               &healthyBSA, 
                               &tumourBSA, 
-                              radixSA, 
+                              dSA, 
                               from,
                               to,
                               startOfTumour,
                               min_suffix);
   }
-  delete radixSA;
+  delete[] dSA;
   for (vector<Suffix_t> & b : threadResult) {
     SA.insert(SA.end(), b.begin(), b.end());
     b.clear();
@@ -92,24 +93,24 @@ void SuffixArray::constructColouredGSA(int min_suffix) {
 }
 
 void SuffixArray::transformSuffixArrayBlock(vector<Suffix_t> *block, 
-    vector<pair<unsigned int, unsigned int> > *healthyBSA,
-    vector<pair<unsigned int, unsigned int> > *tumourBSA,
-    unsigned long long *radixSA, unsigned int from, 
-    unsigned int to, unsigned int startOfTumour, int min_suf) {
+    vector<pair<unsigned int, int64_t> > *healthyBSA,
+    vector<pair<unsigned int, int64_t> > *tumourBSA,
+    int64_t *dSA, int64_t from, 
+    int64_t to, int64_t startOfTumour, int min_suf) {
 //START(SuffixArray_transformSuffixArrayBlock);
-  for(unsigned int i=from; i < to; i++) {
+  for(int64_t i=from; i < to; i++) {
     Suffix_t s;
-    pair<unsigned int, unsigned int> rcPair;
-    if (radixSA[i] < startOfTumour) { // HEALTHY
-      rcPair = binarySearch(*healthyBSA,radixSA[i]);
-      s.offset = radixSA[i] - rcPair.second;
+    pair<unsigned int, int64_t> rcPair;
+    if (dSA[i] < startOfTumour) { // HEALTHY
+      rcPair = binarySearch(*healthyBSA, dSA[i]);
+      s.offset = dSA[i] - rcPair.second;
       if (reads->getReadByIndex(rcPair.first, HEALTHY).size() - s.offset <=
           reads->getMinSuffixSize()) continue;
       s.type = HEALTHY;
     }
     else  { // TUMOUR
-      rcPair = binarySearch(*tumourBSA, radixSA[i] - startOfTumour);
-      s.offset = (radixSA[i] - startOfTumour) - rcPair.second;
+      rcPair = binarySearch(*tumourBSA, dSA[i] - startOfTumour);
+      s.offset = (dSA[i] - startOfTumour) - rcPair.second;
       if (reads->getReadByIndex(rcPair.first, TUMOUR).size() - s.offset
           <= reads->getMinSuffixSize()) continue;
       s.type = TUMOUR;
@@ -121,28 +122,28 @@ void SuffixArray::transformSuffixArrayBlock(vector<Suffix_t> *block,
 }
 
 void SuffixArray::buildBinarySearchArrays(
-                  vector<pair<unsigned int, unsigned int> > *healthyBSA, 
-                  vector<pair<unsigned int, unsigned int> > *tumourBSA) {
+                  vector<pair<unsigned int, int64_t> > *healthyBSA, 
+                  vector<pair<unsigned int, int64_t> > *tumourBSA) {
   generateBSA(*healthyBSA, HEALTHY);
   generateBSA(*tumourBSA, TUMOUR);
 }
 
 void SuffixArray::generateBSA(
-     vector<pair<unsigned int, unsigned int>> &BSA, bool type) {
+     vector<pair<unsigned int, int64_t>> &BSA, bool type) {
 //START(SuffixArray_generateBSA);
-  unsigned int indexInConcat {0};
+  int64_t indexInConcat {0};
   BSA.reserve(reads->getSize(type));
-  BSA.push_back(pair<unsigned int, unsigned int>(0,0));
+  BSA.push_back(pair<unsigned int, int64_t>(0,0));
   for(unsigned int i = 1; i < reads->getSize(type); i++) { 
     indexInConcat += reads->getReadByIndex(i-1, type).size();
-    BSA.push_back(pair<unsigned int, unsigned int>(i,indexInConcat));
+    BSA.push_back(pair<unsigned int, int64_t>(i,indexInConcat));
   }
 //COMP(SuffixArray_generateBSA);
 }
 
-void SuffixArray::constructSuffixArray(unsigned long long **radixSA, 
-                                        unsigned int *startOfTumour,
-                                        unsigned int *sizeOfRadixSA) {
+void SuffixArray::constructSuffixArray(int64_t * &dSA, 
+                                        int64_t *startOfTumour,
+                                        int64_t *sizeOfRadixSA) {
 //START(SuffixArray_constructSuffixArray);
   // concatenate all reads
   string concat = concatenateReads(HEALTHY);
@@ -150,12 +151,18 @@ void SuffixArray::constructSuffixArray(unsigned long long **radixSA,
   concat += concatenateReads(TUMOUR);
   *sizeOfRadixSA = concat.size();
   // Build SA
-  *radixSA = Radix<unsigned long long>((uchar*) concat.c_str(), concat.size()).build();
+  dSA = new int64_t[concat.size()];
+  if (dSA == NULL) {
+    cout << "Could not allocate memory for suffix array. Terminating." << endl;
+    exit(1);
+  }
+  char * text = const_cast<char*>(concat.c_str());
+  divsufsort64((uint8_t*)text, dSA, (int64_t)concat.size());
 //COMP(SuffixArray_constructSuffixArray);
 }
 
-pair<unsigned int, unsigned int> 
-SuffixArray::binarySearch(vector<pair<unsigned int, unsigned int> > &BSA, 
+pair<unsigned int, int64_t> 
+SuffixArray::binarySearch(vector<pair<unsigned int, int64_t> > &BSA, 
                   unsigned int suffixIndex) {
 //START(SuffixArray_binarySearch);
   unsigned int right = BSA.size();

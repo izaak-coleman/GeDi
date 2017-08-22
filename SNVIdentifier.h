@@ -182,8 +182,8 @@ private:
   // transformed with transformBlock() into a second GSA chunk.
   // extractGroups() then generates seed blocks from second GSA.
 
-  void transformBlock(unsigned long long *from, unsigned long long *to,
-                      std::vector< std::pair<unsigned int, unsigned int> > *bsa,
+  void transformBlock(int64_t *from, int64_t *to,
+                      std::vector< std::pair<unsigned int, int64_t> > *bsa,
                       std::vector<read_tag> * block);
   // Transforms a block of the suffix array elements into a block of the
   // second GSA elements.

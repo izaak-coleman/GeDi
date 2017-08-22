@@ -23,7 +23,7 @@ Author: Izaak Coleman
 
 #include <omp.h>
 
-#include "radix.h"
+#include "divsufsort64.h"
 #include "util_funcs.h"
 #include "SNVIdentifier.h"
 #include "SuffixArray.h"
@@ -475,46 +475,48 @@ void SNVIdentifier::extractionWorker(unsigned int seed_index, unsigned int to,
 void SNVIdentifier::seedBreakPointBlocks() {
 //START(SNVIdentifier_seedBreakPointBlocks);
   string concat("");
-  vector<pair<unsigned int, unsigned int>> bsa;
+  vector<pair<unsigned int, int64_t>> bsa;
   set<unsigned int>::iterator it = CancerExtraction.begin();
-  bsa.push_back(pair<unsigned int, unsigned int>(*it,0));
+  bsa.push_back(pair<unsigned int, int64_t>(*it,0));
   concat += reads->getReadByIndex(*it, TUMOUR);
   concat += reverseComplementString(reads->getReadByIndex(*it, TUMOUR));
   concat += TERM;
 
   cout << "Cancer Extraction size: " <<  CancerExtraction.size() << endl;
-  unsigned int concat_idx = 0;
+  int64_t concat_idx = 0;
   it++;
   for (; it != CancerExtraction.end(); it++) {
     concat += reads->getReadByIndex(*it, TUMOUR);
     concat += reverseComplementString(reads->getReadByIndex(*it, TUMOUR));
     concat += TERM;
     concat_idx += reads->getReadByIndex(*std::prev(it), TUMOUR).size() * 2;
-    bsa.push_back(pair<unsigned int, unsigned int>(*it, concat_idx));
+    bsa.push_back(pair<unsigned int, int64_t>(*it, concat_idx));
   }
+
+  char* text = const_cast<char*>(concat.c_str());
+  int64_t * dSA = new int64_t[concat.size()];
 
   // Build SA
   cout << "Building cancer specific sa" << endl;
-  unsigned long long *radixSA = 
-    Radix<unsigned long long>((uchar*) concat.c_str(), concat.size()).build();
+  divsufsort64((uint8_t*)text, dSA,(int64_t)concat.size());
   cout << "Size of cancer specific sa: " << concat.size() << endl;
   cout << "Transforming to cancer specfic gsa" << endl;
 
   omp_set_num_threads(N_THREADS);
-  unsigned int elementsPerThread = concat.size() / N_THREADS;
+  int64_t elementsPerThread = concat.size() / N_THREADS;
   vector< vector<read_tag> > threadWorkArray(N_THREADS, vector<read_tag>());
 #pragma omp parallel for 
   for (int i=0; i < N_THREADS; i++) {
-    unsigned int from = i*elementsPerThread;
-    unsigned int to;
+    int64_t from = i*elementsPerThread;
+    int64_t to;
     if (i == N_THREADS - 1) {
       to = concat.size();
     } else {
       to = (i+1)*elementsPerThread;
     }
-    transformBlock((radixSA + from), (radixSA + to), &bsa, &threadWorkArray[i]);
+    transformBlock((dSA + from), (dSA + to), &bsa, &threadWorkArray[i]);
   }
-  delete radixSA;
+  delete [] dSA;
   vector<read_tag> gsa;
   int gsaSz = 0;
   for (vector<read_tag> const & tw : threadWorkArray) gsaSz += tw.size();
@@ -543,12 +545,12 @@ void SNVIdentifier::seedBreakPointBlocks() {
 ////COMP(SNVIdentifier_seedBreakPointBlocks);
 }
 
-void SNVIdentifier::transformBlock(unsigned long long* from, 
-     unsigned long long* to, vector< pair<unsigned int, unsigned int> > *bsa,
+void SNVIdentifier::transformBlock(int64_t* from, 
+     int64_t* to, vector< pair<unsigned int, int64_t> > *bsa,
      vector<read_tag> *block) {
 //START(SNVIdentifier_transformBlock);
   for (; from < to; from++) {
-    pair<unsigned int, unsigned int> readConcat = SA->binarySearch(*bsa,*from);
+    pair<unsigned int, int64_t> readConcat = SA->binarySearch(*bsa,*from);
     int offset = *from - readConcat.second;
     int readSize = reads->getReadByIndex(readConcat.first, TUMOUR).size();
     bool orientation = RIGHT;
