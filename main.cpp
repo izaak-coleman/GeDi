@@ -46,6 +46,7 @@ static const int    MIN_PHRED_QUAL         = 22;
 static const int    MIN_MAPQ               = 42;
 static const double ALLELE_FREQ_OF_ERR     = 0.1; 
 static const string OUTPUT_PATH            = "./"; 
+static const string CHR                    = "";
 
 
 int main(int argc, char** argv) 
@@ -80,14 +81,15 @@ int main(int argc, char** argv)
       ("output_path,p", po::value<string>()->default_value(OUTPUT_PATH), 
        "Path specifying write location of <output_prefix>.SNV_results <output_prefix>.fastq and <output_prefix>.out\n")
 
+      ("chromosome,c", po::value<string>()->default_value(CHR), 
+       "Target chromosome for SNV calling. Only sam entries with an RNAME = <chromosome> will be extracted from the sam file. Not specifying runs non-targeted mode.\n")
+
       ("expected_coverage,v", po::value<int>()->required(), 
        "Expected coverage of input datasets. Integer. Required.\n")
 
       ("n_threads,t", po::value<int>()->required(), 
        "Number of threads. Integer. Required.\n")
 
-      ("chromosome,c", po::value<string>()->required(), 
-       "Target chromosome for SNV calling. Only sam entries with an RNAME = <chromosome> will be extracted from the sam file. Required.")
 
       ("input_files,i", po::value<string>()->required(), 
        "Path and name of file containing the input file list. Required.\n")
@@ -244,7 +246,8 @@ int main(int argc, char** argv)
     getrusage(RUSAGE_SELF, &rss);
     cout << "RSS START" << rss.ru_maxrss << endl;
     START(GeDi);
-    ReadPhredContainer  reads(vm["input_files"].as<string>());
+    ReadPhredContainer  reads(vm["input_files"].as<string>(),
+                              vm["n_threads"].as<int>());
 
     SuffixArray SA(reads, reads.getMinSuffixSize(), vm["n_threads"].as<int>());
 

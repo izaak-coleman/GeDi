@@ -29,6 +29,7 @@ struct file_and_type {
 class ReadPhredContainer {
 private:
   const int MIN_SUFFIX_SIZE;
+  const int N_THREADS;
 
   // Length of the longest read
   unsigned int maxLen;          
@@ -53,10 +54,9 @@ private:
   // Loads the fastq data in filename into processed_read and processed_phreds,
   // processing them with qualityProcessRawData()
 
-  void qualityProcessRawData(std::vector<fastq_t> *r_data, 
-                            std::vector<std::string> *processed_reads,
-                            std::vector<std::string> *processed_phreds,
-                            int from, int to, int tid);
+  void qualityProcessRawData(std::vector<fastq_t> const& r_data, 
+                            std::vector<std::string> & processed_reads,
+                            std::vector<std::string> & processed_phreds);
   // Performs the following in the order given:
   //  -- Discards reads with a greater than QUALITY_THRESH percentage
   //     of bases that have a phred score less than PHRED_20
@@ -65,7 +65,7 @@ private:
   //  -- Appends TERM_CHAR to each read, for GSA construction.
 public:
 
-  ReadPhredContainer(std::string const& inputFile);
+  ReadPhredContainer(std::string const& inputFile, int n);
 
   char baseQuality(int index, int tissue, int pos);
   // Returns Healthy/TumourPhreds[index][pos]
