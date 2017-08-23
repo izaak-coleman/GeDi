@@ -37,13 +37,29 @@ MIN_SUFFIX_SIZE(_MIN_SUFFIX_SIZE), N_THREADS(n) {
   maxLen = 0;
   parseInputFile(inputFile, datafiles);
   cout << "Loaded " << datafiles.size() << " data files." << endl;
+#pragma omp parallel for num_threads(datafiles.size())
   for(int i=0; i < datafiles.size(); i++) {
-    cout << "Extracting data from " << datafiles[i].file << "..." << endl;
-    if (datafiles[i].tissue == HEALTHY) {
-      loadFastqRawDataFromFile(datafiles[i].file, HealthyReads, HealthyPhreds);
+#pragma omp critical 
+    {
+      cout << "Extracting data from " << datafiles[i].file << "..." << endl;
     }
-    else{ // datafiles[i].tissue == TUMOUR
-      loadFastqRawDataFromFile(datafiles[i].file, TumourReads, TumourPhreds);
+    // thread-local containers
+    vector<string> reads, phreds; 
+    vector<unsigned int> lengths;
+    loadFastqRawDataFromFile(datafiles[i].file, reads, phreds, lengths);
+#pragma omp critical 
+    {
+      for (unsigned int l : lengths) {
+        if (l > maxLen) maxLen = l;
+      }
+
+      if (datafiles[i].tissue == HEALTHY) {
+        HealthyReads.insert(HealthyReads.end(), reads.begin(), reads.end());
+        HealthyPhreds.insert(HealthyPhreds.end(), phreds.begin(), phreds.end());
+      } else {
+        TumourReads.insert(TumourReads.end(), reads.begin(), reads.end());
+        TumourPhreds.insert(TumourPhreds.end(), phreds.begin(), phreds.end());
+      }
     }
   }
   cout << "MAX READ LEN: " << maxLengthRead() << endl;
@@ -81,7 +97,8 @@ void ReadPhredContainer::parseInputFile(string const& inputFile,
 
 void ReadPhredContainer::loadFastqRawDataFromFile(string const& filename, 
                               vector<string> &processed_reads, 
-                              vector<string> & processed_phreds) {
+                              vector<string> & processed_phreds,
+                              vector<unsigned int> & lengths) {
 //START(ReadPhredContainer_loadFastqFromRawDataFile);
   gzFile data_file;
   data_file = gzopen(filename.c_str(), "r");    // open stream to next fastq.gz 
@@ -95,115 +112,110 @@ void ReadPhredContainer::loadFastqRawDataFromFile(string const& filename,
   }
   kseq_destroy(seq);
   gzclose(data_file);
-  qualityProcessRawData(fastq_elements, processed_reads, processed_phreds);
+  qualityProcessRawData(fastq_elements, processed_reads, processed_phreds, lengths);
 //COMP(ReadPhredContainer_loadFastqFromRawDataFile);
-}
-
-void ReadPhredContainer::qualityProcessRawData(vector<fastq_t> const& r_data, 
-                           vector<string> &processed_reads,
-                           vector<string> &processed_phreds){
-  processed_reads.reserve(r_data.size());
-  processed_phreds.reserve(r_data.size());
-  unsigned int elementsPerThread = r_data.size() / N_THREADS;
-  omp_set_num_threads(N_THREADS);
-#pragma omp parallel for 
-  for(unsigned int i = 0; i < r_data.size(); i += elementsPerThread) {
-    unsigned int to = i + elementsPerThread;
-    if (to > r_data.size()) {
-      to = r_data.size();
-    }
-    // local thread stores - used to avoid lock contention when copying
-    // to object data members
-    vector<string> reads, phreds;
-    vector<int> lengths; 
-
-    // begin quality check
-    for (unsigned int from = i; from < to; from++) {
-      double nLowQualBases = 0.0;
-      for(auto it = r_data[from].qual.begin(); it != r_data[from].qual.end(); it++) {
-        if (*it < PHRED_20) nLowQualBases++;
-      }
-      if ((nLowQualBases / r_data[from].qual.size()) > QUALITY_THRESH) continue;
-      // Remove 'N' chars
-      vector<string> read_substrs;
-      vector<string> phred_substrs;
-      int left_arrow{0}, right_arrow{0};
-      while((right_arrow = r_data[from].seq.find(REMOVED_TOKENS, left_arrow)) != string::npos) {
-        if (left_arrow == right_arrow) {
-          left_arrow++;
-          continue;
-        }
-        read_substrs.push_back(r_data[from].seq.substr(left_arrow, right_arrow - left_arrow));
-        phred_substrs.push_back(r_data[from].qual.substr(left_arrow, right_arrow - left_arrow));
-        left_arrow = right_arrow + 1;
-      }
-      read_substrs.push_back(r_data[from].seq.substr(left_arrow));
-      phred_substrs.push_back(r_data[from].qual.substr(left_arrow));
-      // Load data and store length of longest read
-      for (int i=0; i < read_substrs.size(); i++) {
-        if(read_substrs[i].length() >= MIN_SUFFIX_SIZE ) {
-          lengths.push_back(read_substrs[i].length());
-          reads.push_back(read_substrs[i] + TERM_CHAR);
-          phreds.push_back(phred_substrs[i]);
-        }
-      }
-    }
-#pragma omp critical 
-    {
-      for(int i=0; i < reads.size(); i++) {
-        processed_reads.push_back(reads[i]);
-        processed_phreds.push_back(phreds[i]);
-        if(lengths[i] > maxLen) maxLen = lengths[i];
-      }
-    }
-  }
-  processed_reads.shrink_to_fit();
-  processed_phreds.shrink_to_fit();
 }
 
 //void ReadPhredContainer::qualityProcessRawData(vector<fastq_t> const& r_data, 
 //                           vector<string> &processed_reads,
 //                           vector<string> &processed_phreds){
-////START(ReadPhredContainer_qualityProcessRawData);
 //  processed_reads.reserve(r_data.size());
 //  processed_phreds.reserve(r_data.size());
-//  for(int i = 0; i < r_data.size(); i++) {
-//    // Discard low quality reads
-//    double nLowQualBases = 0.0;
-//    for(auto it = r_data[i].qual.begin(); it != r_data[i].qual.end(); it++) {
-//      if (*it < PHRED_20) nLowQualBases++;
+//  unsigned int elementsPerThread = r_data.size() / N_THREADS;
+//  omp_set_num_threads(N_THREADS);
+//#pragma omp parallel for 
+//  for(unsigned int i = 0; i < r_data.size(); i += elementsPerThread) {
+//    unsigned int to = i + elementsPerThread;
+//    if (to > r_data.size()) {
+//      to = r_data.size();
 //    }
-//    if ((nLowQualBases / r_data[i].qual.size()) > QUALITY_THRESH) continue;
-//    // Remove 'N' chars
-//    vector<string> read_substrs;
-//    vector<string> phred_substrs;
-//    int left_arrow{0}, right_arrow{0};
-//    while((right_arrow = r_data[i].seq.find(REMOVED_TOKENS, left_arrow)) != string::npos) {
-//      if (left_arrow == right_arrow) {
-//        left_arrow++;
-//        continue;
+//    // local thread stores - used to avoid lock contention when copying
+//    // to object data members
+//    vector<string> reads, phreds;
+//    vector<int> lengths; 
+//
+//    // begin quality check
+//    for (unsigned int from = i; from < to; from++) {
+//      double nLowQualBases = 0.0;
+//      for(auto it = r_data[from].qual.begin(); it != r_data[from].qual.end(); it++) {
+//        if (*it < PHRED_20) nLowQualBases++;
 //      }
-//      read_substrs.push_back(r_data[i].seq.substr(left_arrow, right_arrow - left_arrow));
-//      phred_substrs.push_back(r_data[i].qual.substr(left_arrow, right_arrow - left_arrow));
-//      left_arrow = right_arrow + 1;
-//    }
-//    read_substrs.push_back(r_data[i].seq.substr(left_arrow));
-//    phred_substrs.push_back(r_data[i].qual.substr(left_arrow));
-//    // Load data and store length of longest read
-//    for (int i=0; i < read_substrs.size(); i++) {
-//      if(read_substrs[i].length() >= MIN_SUFFIX_SIZE ) {
-//        if (read_substrs[i].length() > maxLen) { 
-//          maxLen = read_substrs[i].length();
+//      if ((nLowQualBases / r_data[from].qual.size()) > QUALITY_THRESH) continue;
+//      // Remove 'N' chars
+//      vector<string> read_substrs;
+//      vector<string> phred_substrs;
+//      int left_arrow{0}, right_arrow{0};
+//      while((right_arrow = r_data[from].seq.find(REMOVED_TOKENS, left_arrow)) != string::npos) {
+//        if (left_arrow == right_arrow) {
+//          left_arrow++;
+//          continue;
 //        }
-//        processed_reads.push_back(read_substrs[i] + TERM_CHAR);
-//        processed_phreds.push_back(phred_substrs[i]);
+//        read_substrs.push_back(r_data[from].seq.substr(left_arrow, right_arrow - left_arrow));
+//        phred_substrs.push_back(r_data[from].qual.substr(left_arrow, right_arrow - left_arrow));
+//        left_arrow = right_arrow + 1;
+//      }
+//      read_substrs.push_back(r_data[from].seq.substr(left_arrow));
+//      phred_substrs.push_back(r_data[from].qual.substr(left_arrow));
+//      // Load data and store length of longest read
+//      for (int i=0; i < read_substrs.size(); i++) {
+//        if(read_substrs[i].length() >= MIN_SUFFIX_SIZE ) {
+//          lengths.push_back(read_substrs[i].length());
+//          reads.push_back(read_substrs[i] + TERM_CHAR);
+//          phreds.push_back(phred_substrs[i]);
+//        }
+//      }
+//    }
+//#pragma omp critical 
+//    {
+//      for(int i=0; i < reads.size(); i++) {
+//        processed_reads.push_back(reads[i]);
+//        processed_phreds.push_back(phreds[i]);
+//        if(lengths[i] > maxLen) maxLen = lengths[i];
 //      }
 //    }
 //  }
 //  processed_reads.shrink_to_fit();
 //  processed_phreds.shrink_to_fit();
-////COMP(ReadPhredContainer_qualityProcessRawData);
 //}
+
+void ReadPhredContainer::qualityProcessRawData(vector<fastq_t> const& r_data, 
+                           vector<string> &processed_reads,
+                           vector<string> &processed_phreds,
+                           vector<unsigned int> &lengths) {
+  processed_reads.reserve(r_data.size());
+  processed_phreds.reserve(r_data.size());
+  for(int i = 0; i < r_data.size(); i++) {
+    // Discard low quality reads
+    double nLowQualBases = 0.0;
+    for(auto it = r_data[i].qual.begin(); it != r_data[i].qual.end(); it++) {
+      if (*it < PHRED_20) nLowQualBases++;
+    }
+    if ((nLowQualBases / r_data[i].qual.size()) > QUALITY_THRESH) continue;
+    // Remove 'N' chars
+    vector<string> read_substrs;
+    vector<string> phred_substrs;
+    int left_arrow{0}, right_arrow{0};
+    while((right_arrow = r_data[i].seq.find(REMOVED_TOKENS, left_arrow)) != string::npos) {
+      if (left_arrow == right_arrow) {
+        left_arrow++;
+        continue;
+      }
+      read_substrs.push_back(r_data[i].seq.substr(left_arrow, right_arrow - left_arrow));
+      phred_substrs.push_back(r_data[i].qual.substr(left_arrow, right_arrow - left_arrow));
+      left_arrow = right_arrow + 1;
+    }
+    read_substrs.push_back(r_data[i].seq.substr(left_arrow));
+    phred_substrs.push_back(r_data[i].qual.substr(left_arrow));
+    // Load data and store length of longest read
+    for (int i=0; i < read_substrs.size(); i++) {
+      if(read_substrs[i].length() >= MIN_SUFFIX_SIZE ) {
+        lengths.push_back(read_substrs[i].length());
+        processed_reads.push_back(read_substrs[i] + TERM_CHAR);
+        processed_phreds.push_back(phred_substrs[i]);
+      }
+    }
+  }
+}
 
 unsigned int ReadPhredContainer::maxLengthRead() {
   return maxLen;

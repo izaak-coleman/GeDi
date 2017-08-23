@@ -50,13 +50,15 @@ private:
 
   void loadFastqRawDataFromFile(std::string const& filename, 
                               std::vector<std::string> & processed_reads,
-                              std::vector<std::string> &processed_phreds);
+                              std::vector<std::string> & processed_phreds,
+                              std::vector<unsigned int> & lengths);
   // Loads the fastq data in filename into processed_read and processed_phreds,
   // processing them with qualityProcessRawData()
 
   void qualityProcessRawData(std::vector<fastq_t> const& r_data, 
                             std::vector<std::string> & processed_reads,
-                            std::vector<std::string> & processed_phreds);
+                            std::vector<std::string> & processed_phreds,
+                            std::vector<unsigned int> & lengths);
   // Performs the following in the order given:
   //  -- Discards reads with a greater than QUALITY_THRESH percentage
   //     of bases that have a phred score less than PHRED_20
