@@ -61,9 +61,6 @@ MIN_SUFFIX_SIZE(_MIN_SUFFIX_SIZE), N_THREADS(n) {
       cout << "Extracted data from " << datafiles[i].file << "..." << endl;
     }
   }
-  cout << "MAX READ LEN: " << maxLengthRead() << endl;
-  cout << "Reads: " << TumourReads.size() + HealthyReads.size() << endl;
-  cout << "Phreds: " << TumourPhreds.size() + HealthyPhreds.size() << endl;
 //COMP(ReadPhredContainer_ReadPhredContainer);
 }
 void ReadPhredContainer::parseInputFile(string const& inputFile, 
