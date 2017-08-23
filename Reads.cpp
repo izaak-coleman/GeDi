@@ -35,14 +35,11 @@ MIN_SUFFIX_SIZE(_MIN_SUFFIX_SIZE), N_THREADS(n) {
 //START(ReadPhredContainer_ReadPhredContainer);
   vector<file_and_type> datafiles;
   maxLen = 0;
+  cout << "Input list: "  << endl;
   parseInputFile(inputFile, datafiles);
-  cout << "Loaded " << datafiles.size() << " data files." << endl;
+  cout << "Total number of files: " << datafiles.size() << endl;
 #pragma omp parallel for num_threads(datafiles.size())
   for(int i=0; i < datafiles.size(); i++) {
-#pragma omp critical 
-    {
-      cout << "Extracting data from " << datafiles[i].file << "..." << endl;
-    }
     // thread-local containers
     vector<string> reads, phreds; 
     vector<unsigned int> lengths;
@@ -60,6 +57,8 @@ MIN_SUFFIX_SIZE(_MIN_SUFFIX_SIZE), N_THREADS(n) {
         TumourReads.insert(TumourReads.end(), reads.begin(), reads.end());
         TumourPhreds.insert(TumourPhreds.end(), phreds.begin(), phreds.end());
       }
+      phreds.clear(); reads.clear(); lengths.clear();
+      cout << "Extracted data from " << datafiles[i].file << "..." << endl;
     }
   }
   cout << "MAX READ LEN: " << maxLengthRead() << endl;
@@ -72,7 +71,6 @@ void ReadPhredContainer::parseInputFile(string const& inputFile,
 //START(ReadPhredContainer_parseInputFile);
   ifstream sock;
   sock.open(inputFile.c_str());
-  cout << "Gathering datafiles from " << inputFile << "." << endl;
   string file_string;
   while (getline(sock, file_string)) {
     vector<string> fields;
@@ -87,7 +85,7 @@ void ReadPhredContainer::parseInputFile(string const& inputFile,
            << endl << "Program terminating." << endl;
       exit(1);
     }
-    cout << "Input " << fields[0] << " as "
+    cout << "Inputing " << fields[0] << " as "
          << ((fields[1] == HEALTHY_DATA) ? "healthy" : "tumour") << " data "
          << endl;
   }
@@ -118,11 +116,11 @@ void ReadPhredContainer::loadFastqRawDataFromFile(string const& filename,
 
 //void ReadPhredContainer::qualityProcessRawData(vector<fastq_t> const& r_data, 
 //                           vector<string> &processed_reads,
-//                           vector<string> &processed_phreds){
+//                           vector<string> &processed_phreds,
+//                           vector<unsigned int> &lengths){
 //  processed_reads.reserve(r_data.size());
 //  processed_phreds.reserve(r_data.size());
 //  unsigned int elementsPerThread = r_data.size() / N_THREADS;
-//  omp_set_num_threads(N_THREADS);
 //#pragma omp parallel for 
 //  for(unsigned int i = 0; i < r_data.size(); i += elementsPerThread) {
 //    unsigned int to = i + elementsPerThread;
