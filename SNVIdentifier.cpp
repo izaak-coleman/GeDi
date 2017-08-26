@@ -145,13 +145,14 @@ void SNVIdentifier::free() {
 bool SNVIdentifier::excessLowQuality(consensus_pair & pair) {
 //START(SNVIdentifier_excessLowQuality);
   int numLowQuality{0};
-  for (int pos = 0; pos < pair.mutated.size(); pos++) {
-    if (pair.mqual[pos] == 'L' || pair.nqual[pos] == 'L' || pair.nqual[pos] == 'B') {
-      numLowQuality++;
-    }
+  for (int i = 0; i < pair.mutated.size(); i++) {
+    if (pair.mqual[i] == 'L') numLowQuality++;
+  }
+  for (int i = 0; i < pair.non_mutated.size(); i++) {
+    if (pair.nqual[i] == 'L' || pair.nqual[pos] == 'B') numLowQuality++;
   }
   if (numLowQuality > MAX_LOW_CONFIDENCE_POS) return true;
-  else return false;
+  return false;
 //COMP(SNVIdentifier_excessLowQuality);
 }
 
