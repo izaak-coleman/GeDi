@@ -26,6 +26,11 @@ Author: Izaak Coleman
 
 #include "divsufsort64.h"
 
+// debug
+#include <execinfo.h>
+#include <stdio.h>
+#include <stdlib.h>
+
 using namespace std;
 
 SuffixArray::SuffixArray(ReadPhredContainer &reads, int m, int n):
@@ -190,8 +195,22 @@ string SuffixArray::concatenateReads(bool type) {
 //COMP(SuffixArray_concatenateReads);
 }
 
-Suffix_t & SuffixArray::getElem(int index) {
+Suffix_t & SuffixArray::getElem(unsigned int index) {
   if (index >= SA.size() || index < 0) {
+    int nptrs;
+    void *buffer[1000];
+    char **strings;
+    nptrs = backtrace(buffer, 1000);
+    cout << "backtrace() returned " << nptrs << " adresses" << endl;
+    strings = backtrace_symbols(buffer, nptrs);
+    if (strings == NULL) {
+      cerr << "Backtrace error" << endl;
+      exit(1);
+    }
+    for (int j = 0; j < nptrs; j++) {
+      printf("%s\n", strings[j]);
+    }
+    std::free(strings);
     cout << "getElem() out of bounds" << endl;
     exit(1);
   }

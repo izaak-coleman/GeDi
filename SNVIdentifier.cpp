@@ -125,15 +125,18 @@ void SNVIdentifier::buildConsensusPairsWorker(bpBlock** block, bpBlock** end,
     generateConsensusSequence(HEALTHY, **block, pair.nmut_offset, pair.non_mutated, pair.nqual);
     delete *block;
     *block = nullptr;
+    if (pair.mutated.empty() || pair.non_mutated.empty()) {
+      continue;
+    }
     if (excessLowQuality(pair)) {
       continue;
     }
     trimHealthyConsensus(pair); // MUST trim healthy first
     trimCancerConsensus(pair);
-    maskLowQualityPositions(pair);
     if (pair.mutated.empty() || pair.non_mutated.empty()) {
       continue;
     }
+    maskLowQualityPositions(pair);
     localThreadStore.push_back(pair);
   }
 }
@@ -149,7 +152,7 @@ bool SNVIdentifier::excessLowQuality(consensus_pair & pair) {
     if (pair.mqual[i] == 'L') numLowQuality++;
   }
   for (int i = 0; i < pair.non_mutated.size(); i++) {
-    if (pair.nqual[i] == 'L' || pair.nqual[pos] == 'B') numLowQuality++;
+    if (pair.nqual[i] == 'L' || pair.nqual[i] == 'B') numLowQuality++;
   }
   if (numLowQuality > MAX_LOW_CONFIDENCE_POS) return true;
   return false;
@@ -431,11 +434,13 @@ void SNVIdentifier::extractionWorker(unsigned int seed_index, unsigned int to,
   unsigned int extension {seed_index + 1};
   while (seed_index < to && seed_index != SA->getSize() - 1) {   // CONFIRM EFFECT OF THIS
     double c_reads{0}, h_reads{0};    // reset counts
+    if (seed_index > SA->getSize() || seed_index < 0) cout << "seed_index" << endl;
+    if (to > SA->getSize()         || to < 0)         cout << "to" << endl;
+    if (extension > SA->getSize()  || extension < 0)  cout << "extension" << endl;
 
     // Assuming that a > 2 group will form, start counting from seed_index
     if (SA->getElem(seed_index).type == HEALTHY) h_reads++;
     else c_reads++;
-
     while (::computeLCP(SA->getElem(seed_index), SA->getElem(extension), *reads)
         >= reads->getMinSuffixSize()) {
       // tally tissue types of group
@@ -451,6 +456,7 @@ void SNVIdentifier::extractionWorker(unsigned int seed_index, unsigned int to,
     else if (c_reads >= GSA1_MCT  && (h_reads / c_reads) <= ECONT)  {
       for (unsigned int i = seed_index; i < extension; i++) {
         if (SA->getElem(i).type == TUMOUR) {
+          if (i > SA->getSize() || i < 0)  cout << "i" << endl;
           threadExtr.insert(SA->getElem(i).read_id);
         }
       }

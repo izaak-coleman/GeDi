@@ -71,7 +71,7 @@ private:
 public:
   SuffixArray(ReadPhredContainer &reads, int min_suffix, int n_threads);
 
-  Suffix_t & getElem(int index);
+  Suffix_t & getElem(unsigned int index);
 
   unsigned int getSize();
 
