@@ -243,8 +243,6 @@ int main(int argc, char** argv)
     } 
     // Run GeDi
     struct rusage rss;
-    getrusage(RUSAGE_SELF, &rss);
-    cout << "RSS START" << rss.ru_maxrss << endl;
     START(GeDi);
     ReadPhredContainer  reads(vm["input_files"].as<string>(),
                               vm["n_threads"].as<int>());
@@ -269,8 +267,6 @@ int main(int argc, char** argv)
                         vm["bt2-idx"].as<string>(),
                         vm["min_mapq"].as<int>());
     COMP(GeDi);
-    getrusage(RUSAGE_SELF, &rss);
-    cout << "RSS FINISH" << rss.ru_maxrss << endl;
     return SUCCESS;
   } 
   catch(std::exception& e) 

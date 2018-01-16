@@ -35,11 +35,9 @@ using namespace std;
 
 SuffixArray::SuffixArray(ReadPhredContainer &reads, int m, int n):
 N_THREADS(n), MIN_SUFFIX_SIZE(m) {
-  cout << "MIN SUFFIX " <<  MIN_SUFFIX_SIZE << endl;
   this->reads = &reads;
-  cout << "Starting constructColouredGSA:" << endl;
   constructPrimaryGSA(MIN_SUFFIX_SIZE);
-  cout << "GSA1 size: " << SA.size() << endl;
+  cout << "Primary GSA size: " << SA.size() << endl;
 }
 
 void SuffixArray::constructPrimaryGSA(int min_suffix) {

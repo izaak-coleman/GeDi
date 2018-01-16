@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <time.h>
 #include <sstream>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 #define START(x) auto x##start = std::chrono::steady_clock::now()                                         
 #define END(x)   auto x##end   = std::chrono::steady_clock::now()                                         
@@ -34,3 +36,8 @@
 #define MEND(x)   auto x##end   = std::chrono::steady_clock::now()                                         
 #define MTIME(x)  auto x##time  = std::chrono::duration_cast<std::chrono::nanoseconds>(x##end-x##start).count()
 #define MPRINT(x) std::cout << x << "(), " << x##time << std::endl
+
+#define INITRSS(x) struct rusage x##rss; getrusage(RUSAGE_SELF, &x##rss);
+#define PRINTRSS(x) getrusage(RUSAGE_SELF, &x##rss);\
+  std::cout << #x << "(), " << x##rss.ru_maxrss << " B" << std::endl; \
+  
