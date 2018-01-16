@@ -79,7 +79,7 @@ void GenomeMapper::constructSNVFastqData(string const& fastqName) {
 //START(GenomeMapper_constructSNVFastqData);
   ofstream snv_fq;
   snv_fq.open(fastqName.c_str());
-  for (int i = 0; i < snvId->cnsPairSize(); i++) {
+  for (int64_t i = 0; i < snvId->cnsPairSize(); i++) {
     consensus_pair &cns_pair = snvId->getPair(i);
     string qual(cns_pair.non_mutated.size(), '!'); 
     snv_fq << "@" + cns_pair.mutated + "[" + to_string(cns_pair.left_ohang) + 
@@ -215,7 +215,7 @@ void GenomeMapper::outputSNVToUser(vector<SamEntry*> &alignments, string outName
   
   ofstream report(outName);
   report << "Mut_ID\tType\tChr\tPos\tNormal_NT\tTumor_NT\n";
-  unsigned int i=0;
+  int64_t i=0;
   for(single_snv &snv : separate_snvs) {
     report << i << "\t" << "SNV\t" << snv.chr << "\t"
            << snv.position << "\t"

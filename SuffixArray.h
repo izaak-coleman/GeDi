@@ -22,7 +22,7 @@ private:
   ReadPhredContainer *reads;
   std::vector<Suffix_t> SA;
 
-  void constructColouredGSA(int min_suffix);
+  void constructPrimaryGSA(int min_suffix);
   // Primary function call to generate GeDi's coloured Generalized Suffix Array.
 
   void constructSuffixArray(int64_t * &dSA, 
@@ -71,9 +71,9 @@ private:
 public:
   SuffixArray(ReadPhredContainer &reads, int min_suffix, int n_threads);
 
-  Suffix_t & getElem(unsigned int index);
+  Suffix_t & getElem(int64_t index);
 
-  unsigned int getSize();
+  int64_t getSize();
 
   std::pair<unsigned int, int64_t> 
   binarySearch(std::vector<std::pair<unsigned int,  int64_t> > &BSA, 

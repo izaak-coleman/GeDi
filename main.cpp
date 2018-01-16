@@ -248,8 +248,9 @@ int main(int argc, char** argv)
     START(GeDi);
     ReadPhredContainer  reads(vm["input_files"].as<string>(),
                               vm["n_threads"].as<int>());
-
+    START(DFE_opt1);
     SuffixArray SA(reads, reads.getMinSuffixSize(), vm["n_threads"].as<int>());
+    COMP(DFE_opt1);
 
     SNVIdentifier snvId(SA, reads, 
                          vm["min_phred"].as<int>()+BASE33_CONVERSION,

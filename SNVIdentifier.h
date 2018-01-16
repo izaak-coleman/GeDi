@@ -155,7 +155,7 @@ private:
   std::vector<consensus_pair> consensus_pairs;
   // Elements are consensus sequences generated from break point blocks.
 
-  unsigned int backUpSearchStart(unsigned int seed_index);
+  int64_t backUpSearchStart(int64_t seed_index);
   // The worker threads that seed break point blocks from the second gsa
   // may begin block generation from the middle of block. 
   // backUpSearchStart() moves the start of block generation to the
@@ -165,8 +165,7 @@ private:
   // Divides coloured GSA into even chunks and deploys threads
   // with each thread computing extractGroupsWorker() over an allocated chunk.
 
-  void extractionWorker(unsigned int to, unsigned int from, std::set<unsigned
-      int> & threadExtr);
+  void extractionWorker(int64_t to, int64_t from, std::set<unsigned int> & threadExtr);
   // Passes through allocated GSA chunk and extracts reads as cancer specific 
   // reads if:
   // -- Suffixes of cancer specific reads form a block that covers the
@@ -188,11 +187,11 @@ private:
   // Transforms a block of the suffix array elements into a block of the
   // second GSA elements.
   
-  void extractGroups(std::vector<read_tag> const& gsa);
+  void extractBlocks(std::vector<read_tag> const& gsa);
   // Divides second GSA gsa into even chunks and deploys threads
   // with each thread computing extractGroupsWorker() over an allocated chunk.
 
-  void extractGroupsWorker(unsigned int seed_index, unsigned int to,
+  void extractBlocksWorker(int64_t seed_index, int64_t to,
                            std::vector<read_tag> const* gsa_ptr,
                            std::vector<bpBlock*> & localThreadStore);
   // Passes through the allocated second GSA chunk extracting sets
@@ -224,7 +223,7 @@ private:
   // If search fails, the two regions flanking of the failed search
   // sequence are searched.
 
-  long long int binarySearch(std::string query);
+  int64_t binarySearch(std::string query);
   // Binary search for query in coloured GSA, returns:
   //  -- failed search: -1 
   //  -- success: index of matching suffix
@@ -239,7 +238,7 @@ private:
 
   int minVal(int a, int b);
 
-  bool extendBlock(int seed_index, bpBlock 
+  bool extendBlock(int64_t seed_index, bpBlock 
       &block, bool orientation, int calibration);
   // seed_index, the location where binarSearch() found a match to 
   // the query is used as the start point to gather healthy reads
@@ -247,12 +246,12 @@ private:
   // coloured GSA.
   // Returns false if search failed to extract any healthy reads,
   // true otherwise
-  bool getSuffixesFromLeft(int seed_index, 
+  bool getSuffixesFromLeft(int64_t seed_index, 
                            bpBlock &block,
                            bool orientation, int calibration);
   // called by extendBlock(). Returns false if failed to 
   // extract any healthy reads, true otherwise
-  bool getSuffixesFromRight(int seed_index, 
+  bool getSuffixesFromRight(int64_t seed_index, 
                            bpBlock &block, 
                            bool orientation, int calibration);
   // called by extendBlock(). Returns false if failed to 
@@ -303,9 +302,9 @@ public:
                     int n_threads, int max_low_confidence_pos,
                     double econt, double allelic_freq_of_error);
 
-  unsigned int getSize();
-  consensus_pair & getPair(int i);
-  int cnsPairSize();
+  int64_t getSize();
+  consensus_pair & getPair(int64_t i);
+  int64_t cnsPairSize();
   void free();
   // Deallocates memosy allocated for consensus_pairs
 

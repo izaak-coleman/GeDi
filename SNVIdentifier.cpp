@@ -57,9 +57,10 @@ SNVIdentifier::SNVIdentifier(SuffixArray &_SA,
   cout << "UBT: " << COVERAGE_UPPER_THRESHOLD << endl;
   cout << "ALLELIC_FREQ_OF_ERROR: " << ALLELIC_FREQ_OF_ERROR << endl;
   cout << MIN_PHRED_QUAL << endl;
-
+  START(DFE_opt2);
   cout << "Extracting cancer-specific reads..." << endl;
   extractCancerSpecificReads(); 
+  COMP(DFE_opt2);
   cout << "No of extracted reads: " << CancerExtraction.size() << endl;
   // Group blocks covering same mutations in both orientations
   cout << "Seeding breakpoint blocks by constructing GSA2..." << endl;
@@ -68,7 +69,8 @@ SNVIdentifier::SNVIdentifier(SuffixArray &_SA,
   cout << "Number of seed blocks: " << SeedBlocks.size() << endl;
   cout << "<<<<<<<<<<<<<<building consensus pairs " << endl;
 
-  unsigned int elementsPerThread;
+  START(CNS_construction);
+  int64_t elementsPerThread;
   int n_threads;
   if (SeedBlocks.size() < N_THREADS) {
     omp_set_num_threads(1);
@@ -97,6 +99,7 @@ SNVIdentifier::SNVIdentifier(SuffixArray &_SA,
       threadWork.clear();
     }
   }
+  COMP(CNS_construction);
   reads->free();
   SA->free();
   cout << "<<<<<<<<<<<<<<Finished break point block construction" << endl;
@@ -214,8 +217,8 @@ void SNVIdentifier::extractNonMutatedAlleles(bpBlock &block,
   bool LEFT{false}, RIGHT{true};
   string query = pair.mutated.substr(pair.mut_offset, reads->getMinSuffixSize());
   string rcquery = reverseComplementString(query);
-  long long int fwd_idx = binarySearch(query);
-  long long int rev_idx = binarySearch(rcquery);
+  int64_t fwd_idx = binarySearch(query);
+  int64_t rev_idx = binarySearch(rcquery);
 
   bool success_left{false}, success_right{false};
   if (fwd_idx != -1) {
@@ -391,11 +394,11 @@ void SNVIdentifier::buildQualityString(string & qual, vector<int> const& freq_ma
 void SNVIdentifier::extractCancerSpecificReads() {
 //START(SNVIdentifier_extractCancerSpecificReads);
   omp_set_num_threads(N_THREADS);
-  unsigned int elementsPerThread = (SA->getSize() / N_THREADS);
+  int64_t elementsPerThread = (SA->getSize() / N_THREADS);
 #pragma omp parallel for
-  for (int i=0; i < N_THREADS; i++) {
-    int from = i*elementsPerThread;
-    int to;
+  for (unsigned int i=0; i < N_THREADS; i++) {
+    int64_t from = i*elementsPerThread;
+    int64_t to;
     if (i == N_THREADS - 1) {
       to = SA->getSize();
     } else {
@@ -412,12 +415,12 @@ void SNVIdentifier::extractCancerSpecificReads() {
 //COMP(SNVIdentifier_extractCancerSpecificReads);
 }
 
-unsigned int SNVIdentifier::backUpSearchStart(unsigned int seedIndex) {
+int64_t SNVIdentifier::backUpSearchStart(int64_t seedIndex) {
 //START(SNVIdentifier_backUpSearchStart);
   if (seedIndex == 0) {
     return seedIndex;
   }
-  unsigned int startPoint = seedIndex;
+  int64_t startPoint = seedIndex;
   while (::computeLCP(SA->getElem(startPoint), SA->getElem(seedIndex - 1),
         *reads) >= reads->getMinSuffixSize()) {
     seedIndex--;
@@ -427,17 +430,12 @@ unsigned int SNVIdentifier::backUpSearchStart(unsigned int seedIndex) {
 //COMP(SNVIdentifier_backUpSearchStart);
 }
 
-void SNVIdentifier::extractionWorker(unsigned int seed_index, unsigned int to,
-    set<unsigned int> & threadExtr) {
+void SNVIdentifier::extractionWorker(int64_t seed_index, int64_t to, set<unsigned int> & threadExtr) {
 //START(SNVIdentifier_extractionWorker);
   seed_index = backUpSearchStart(seed_index);
-  unsigned int extension {seed_index + 1};
+  int64_t extension {seed_index + 1};
   while (seed_index < to && seed_index != SA->getSize() - 1) {   // CONFIRM EFFECT OF THIS
     double c_reads{0}, h_reads{0};    // reset counts
-    if (seed_index > SA->getSize() || seed_index < 0) cout << "seed_index" << endl;
-    if (to > SA->getSize()         || to < 0)         cout << "to" << endl;
-    if (extension > SA->getSize()  || extension < 0)  cout << "extension" << endl;
-
     // Assuming that a > 2 group will form, start counting from seed_index
     if (SA->getElem(seed_index).type == HEALTHY) h_reads++;
     else c_reads++;
@@ -454,7 +452,7 @@ void SNVIdentifier::extractionWorker(unsigned int seed_index, unsigned int to,
       threadExtr.insert(SA->getElem(seed_index).read_id);           // extract read
     }
     else if (c_reads >= GSA1_MCT  && (h_reads / c_reads) <= ECONT)  {
-      for (unsigned int i = seed_index; i < extension; i++) {
+      for (int64_t i = seed_index; i < extension; i++) {
         if (SA->getElem(i).type == TUMOUR) {
           if (i > SA->getSize() || i < 0)  cout << "i" << endl;
           threadExtr.insert(SA->getElem(i).read_id);
@@ -481,6 +479,7 @@ void SNVIdentifier::extractionWorker(unsigned int seed_index, unsigned int to,
 
 void SNVIdentifier::seedBreakPointBlocks() {
 //START(SNVIdentifier_seedBreakPointBlocks);
+  START(DFE_opt3);
   string concat("");
   vector<pair<unsigned int, int64_t>> bsa;
   set<unsigned int>::iterator it = CancerExtraction.begin();
@@ -525,7 +524,7 @@ void SNVIdentifier::seedBreakPointBlocks() {
   }
   delete [] dSA;
   vector<read_tag> gsa;
-  int gsaSz = 0;
+  int64_t gsaSz = 0;
   for (vector<read_tag> const & tw : threadWorkArray) gsaSz += tw.size();
   gsa.reserve(gsaSz);
   for (vector<read_tag> & tw : threadWorkArray) {
@@ -538,7 +537,8 @@ void SNVIdentifier::seedBreakPointBlocks() {
   struct rusage rss;
   getrusage(RUSAGE_SELF, &rss);
   cout << "RSS after secondary GSA(): " << rss.ru_maxrss << endl;
-  extractGroups(gsa);
+  extractBlocks(gsa);
+  COMP(DFE_opt3);
   getrusage(RUSAGE_SELF, &rss);
   cout << "RSS extractGroups(): " << rss.ru_maxrss << endl;
 
@@ -605,42 +605,42 @@ int SNVIdentifier::computeLCP(read_tag const& a, read_tag const& b) {
 //COMP(SNVIdentifier_computeLCP);
 }
 
-void SNVIdentifier::extractGroups(vector<read_tag> const& gsa) {
+void SNVIdentifier::extractBlocks(vector<read_tag> const& gsa) {
 //START(SNVIdentifier_extractGroups);
   omp_set_num_threads(N_THREADS);
-  unsigned int elementsPerThread = gsa.size() / N_THREADS;
+  int64_t elementsPerThread = gsa.size() / N_THREADS;
 #pragma omp parallel for
   for (int i=0; i < N_THREADS; i++) {
-    int from = i*elementsPerThread;
-    int to;
+    int64_t from = i*elementsPerThread;
+    int64_t to;
     if (i == N_THREADS - 1) {
       to = gsa.size();
     } else {
       to  = (i+1)*elementsPerThread;
     }
     vector<bpBlock*> threadWork;
-    extractGroupsWorker(from, to, &gsa, threadWork);
+    extractBlocksWorker(from, to, &gsa, threadWork);
 #pragma omp critical
     SeedBlocks.insert(SeedBlocks.end(), threadWork.begin(), threadWork.end());
   }
 //COMP(SNVIdentifier_extractGroups);
 }
 
-void SNVIdentifier::extractGroupsWorker(unsigned int seedIndex,
-                                            unsigned int to,
+void SNVIdentifier::extractBlocksWorker(int64_t seedIndex,
+                                            int64_t to,
                                             vector<read_tag> const* gsa_ptr,
                                             vector<bpBlock*> & localThreadStore) {
 //START(SNVIdentifier_extractGroupsWorker);
   vector<read_tag> const& gsa = *gsa_ptr;
   // backup to block start
   if (seedIndex !=  0) {
-    unsigned int startPoint = seedIndex;
+    int64_t startPoint = seedIndex;
     while (computeLCP(gsa[startPoint], gsa[seedIndex-1]) >= reads->getMinSuffixSize()) {
       seedIndex--;
       if (seedIndex == 0) break;
     }
   }
-  unsigned int extension{seedIndex + 1};
+  int64_t extension{seedIndex + 1};
   while (seedIndex < to && seedIndex != gsa.size() - 1) {
     bpBlock * block;
     while (computeLCP(gsa[seedIndex], gsa[extension]) >= reads->getMinSuffixSize()) {
@@ -649,7 +649,7 @@ void SNVIdentifier::extractGroupsWorker(unsigned int seedIndex,
     }
     if (extension - seedIndex >= GSA2_MCT) {
       block = new bpBlock;
-      for (int i = seedIndex; i < extension; i++) block->insert(gsa[i]);
+      for (int64_t i = seedIndex; i < extension; i++) block->insert(gsa[i]);
     } else {
       seedIndex = extension++;
       continue;
@@ -666,7 +666,7 @@ void SNVIdentifier::extractGroupsWorker(unsigned int seedIndex,
 }
 
 
-bool SNVIdentifier::extendBlock(int seed_index, 
+bool SNVIdentifier::extendBlock(int64_t seed_index, 
     bpBlock &block, bool orientation, int calibration) {
 //START(SNVIdentifier_extendBlock);
   // seed_index is the index of the unique suffix_t this function
@@ -692,11 +692,11 @@ bool SNVIdentifier::extendBlock(int seed_index,
 //COMP(SNVIdentifier_extendBlock);
 }
 
-bool SNVIdentifier::getSuffixesFromLeft(int seed_index,
+bool SNVIdentifier::getSuffixesFromLeft(int64_t seed_index,
   bpBlock &block, bool orientation, int calibration) {
 //START(SNVIdentifier_getSuffixesFromLeft);
   bool success = false;
-  int left_arrow = seed_index-1;
+  int64_t left_arrow = seed_index-1;
   // While lexicographally adjacent suffixes share the same lcp value
   // they have the same branchpoint, thus they are in the same group,
   // so add them
@@ -736,11 +736,11 @@ bool SNVIdentifier::getSuffixesFromLeft(int seed_index,
 //COMP(SNVIdentifier_getSuffixesFromLeft);
 }
 
-bool SNVIdentifier::getSuffixesFromRight(int seed_index,
+bool SNVIdentifier::getSuffixesFromRight(int64_t seed_index,
     bpBlock&block, bool orientation, int calibration) {
 //START(SNVIdentifier_getSuffixesFromRight);
   bool success = false;
-  int right_arrow = seed_index+1;
+  int64_t right_arrow = seed_index+1;
   // While lexicographically adjacent suffixes share the same lcp val
   // they have the same branchpoint, thus they are in the same group
   // so add them
@@ -804,12 +804,12 @@ bool SNVIdentifier::lexCompare(string const& l, string const& r, unsigned int mi
 //COMP(SNVIdentifier_lexCompare);
 }
 
-long long int SNVIdentifier::binarySearch(string query) {
+int64_t SNVIdentifier::binarySearch(string query) {
 //START(SNVIdentifier_binarySearch);
   // Search bounds
-  unsigned int right{SA->getSize() - 1};   // start at non-out of bounds
-  unsigned int left{0};
-  unsigned int mid;
+  int64_t right{SA->getSize() - 1};   // start at non-out of bounds
+  int64_t left{0};
+  int64_t mid;
 
   // prefix lengths with query
   unsigned int min_left_right;
@@ -1016,15 +1016,15 @@ void SNVIdentifier::unifyBlocks(vector<bpBlock> & seedBlocks) {
 //COMP(SNVIdentifier_unifyBlocks);
 }
 
-unsigned int SNVIdentifier::getSize() {
+int64_t SNVIdentifier::getSize() {
   return BreakPointBlocks.size();
 }
 
-consensus_pair & SNVIdentifier::getPair(int i) {
+consensus_pair & SNVIdentifier::getPair(int64_t i) {
   return consensus_pairs[i];
 }
 
-int SNVIdentifier::cnsPairSize() {
+int64_t SNVIdentifier::cnsPairSize() {
   return consensus_pairs.size();
 }
 

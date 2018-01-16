@@ -38,11 +38,11 @@ N_THREADS(n), MIN_SUFFIX_SIZE(m) {
   cout << "MIN SUFFIX " <<  MIN_SUFFIX_SIZE << endl;
   this->reads = &reads;
   cout << "Starting constructColouredGSA:" << endl;
-  constructColouredGSA(MIN_SUFFIX_SIZE);
+  constructPrimaryGSA(MIN_SUFFIX_SIZE);
   cout << "GSA1 size: " << SA.size() << endl;
 }
 
-void SuffixArray::constructColouredGSA(int min_suffix) {
+void SuffixArray::constructPrimaryGSA(int min_suffix) {
   int64_t *dSA; // divsufsort64 suffix array
   int64_t startOfTumour;
   int64_t radixSASize;
@@ -180,7 +180,7 @@ SuffixArray::binarySearch(vector<pair<unsigned int, int64_t> > &BSA,
     else if (suffixIndex > BSA[mid].second) left = mid+1;
     else right = mid;
   }
-  left--;
+  if (left != BSA[BSA.size()-1].second) left--;
   return BSA[left]; // left on the tuple
 //COMP(SuffixArray_binarySearch);
 }
@@ -195,29 +195,15 @@ string SuffixArray::concatenateReads(bool type) {
 //COMP(SuffixArray_concatenateReads);
 }
 
-Suffix_t & SuffixArray::getElem(unsigned int index) {
+Suffix_t & SuffixArray::getElem(int64_t index) {
   if (index >= SA.size() || index < 0) {
-    int nptrs;
-    void *buffer[1000];
-    char **strings;
-    nptrs = backtrace(buffer, 1000);
-    cout << "backtrace() returned " << nptrs << " adresses" << endl;
-    strings = backtrace_symbols(buffer, nptrs);
-    if (strings == NULL) {
-      cerr << "Backtrace error" << endl;
-      exit(1);
-    }
-    for (int j = 0; j < nptrs; j++) {
-      printf("%s\n", strings[j]);
-    }
-    std::free(strings);
     cout << "getElem() out of bounds" << endl;
     exit(1);
   }
   return SA[index];
 }
 
-unsigned int SuffixArray::getSize() {
+int64_t SuffixArray::getSize() {
   return SA.size();
 }
 

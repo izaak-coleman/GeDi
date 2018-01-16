@@ -3,7 +3,7 @@ LINKDIVSUF=-Wl,-R libdivsufsort-master/build/lib/  -L libdivsufsort-master/build
 INCDIVSUF=-I libdivsufsort-master/build/include -ldivsufsort64
 EXE=GeDi
 CXX=g++
-COMPFLAGS=-MMD -fopenmp -std=c++11 -O2
+COMPFLAGS=-MMD -fopenmp -std=c++11 -O2 -rdynamic
 
 $(EXE):$(OBJ)
 	$(CXX) $(COMPFLAGS) $(OBJ) -o $(EXE) $(LINKDIVSUF) -lz -lboost_regex -lboost_program_options
