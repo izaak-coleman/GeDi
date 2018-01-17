@@ -1,0 +1,293 @@
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <cinttypes>
+#include <cstdlib>
+#include <cstdio>
+#include <cstring>
+#include <unistd.h>
+#include <fcntl.h>
+#include <zlib.h>
+
+#include "kseq.h"
+#include "gsa.h"
+#include "divsufsort64.h"
+#include "benchmark.h"
+#include "util_funcs.h"
+
+KSEQ_INIT(gzFile, gzread);    // initialize .gz parser
+
+using namespace std;
+static char const TERM_CHAR = '$';
+static char const PHRED_DELIM = '\0';
+static int const MIN_SUF_LEN = 30;
+static const          string HEALTHY_DATA = "H";
+static const          string TUMOUR_DATA  = "T";
+static const char     PHRED_20 = '5';
+static const double   QUAL_THRESH = 0.1;
+static const char     REMOVED_TOKEN = 'N';
+
+void GSA::split_string(string const & s, string const & tokens, vector<string> &split_strings) {
+  char *c_s = const_cast<char*>(s.c_str());
+  char *c_tokens = const_cast<char*>(tokens.c_str());
+  char *c_split = strtok(c_s, c_tokens); // split string into delimited cstrings
+  while (c_split != NULL) {
+    split_strings.push_back(c_split);
+    c_split = strtok(NULL, c_tokens);
+  }
+}
+
+GSA::GSA(string const& header_fname) {
+  vector<string> h_fnames, t_fnames;
+  read_header(header_fname, h_fnames, t_fnames);
+  for (string const & f : h_fnames) {
+    cout << f << endl;
+    load_fq_data(f);
+  }
+  tsi = concat.size();
+  for (string const & f : t_fnames) {
+    cout << f << endl;
+    load_fq_data(f);
+  }
+}
+
+void GSA::print_reads() {
+  size_t base{0}, top{0};
+  while ((top = concat.find(TERM_CHAR, base)) != string::npos) {
+    cout << concat.substr(base, top-base+1) << endl;
+    base = top+1;
+  }
+}
+void GSA::print_phreds() {
+  size_t base{0}, top{0};
+  while ((top = phred.find(PHRED_DELIM, base)) != string::npos) {
+    cout << phred.substr(base, top-base+1) << endl;
+    base = top+1;
+  }
+}
+
+
+void GSA::print_concat() {
+  for(string::const_iterator it = concat.cbegin(); it < concat.cend(); it++) {
+    cout << *it;
+  }
+  cout << endl;
+}
+
+void GSA::load_fq_data(string const & fname) {
+  gzFile data;
+  data = gzopen(fname.c_str(), "r");
+  kseq_t *fq = kseq_init(data);
+  while (kseq_read(fq) >= 0) {
+    if (fq->qual.l && good_quality(fq)) {
+      add_fq_data(fq);
+    }
+  }
+  kseq_destroy(fq);
+  gzclose(data);
+}
+
+bool GSA::good_quality(void const * vpt) {
+  kseq_t * fq = (kseq_t*) vpt;
+  double n_lowq_bases{0.0};
+  for (char const* it = fq->qual.s; it < (fq->qual.s + fq->qual.l); it++) {
+    if (*it < PHRED_20) ++n_lowq_bases; 
+  }
+  if ((n_lowq_bases / fq->qual.l) > QUAL_THRESH) return false;
+  else return true;
+}
+
+void GSA::add_fq_data(void const * vpt) {
+  kseq_t * fq = (kseq_t*) vpt;
+  string seq(fq->seq.s), qual(fq->qual.s);
+  vector<string> read_substrs;
+  vector<string> phred_substrs;
+  int left_arrow{0}, right_arrow{0};
+  while((right_arrow = seq.find(REMOVED_TOKEN, left_arrow)) != string::npos) {
+    if (left_arrow == right_arrow) {
+      left_arrow++;
+      continue;
+    }
+    else if ((right_arrow - left_arrow) < MIN_SUF_LEN) {
+      left_arrow = right_arrow + 1;
+      continue;
+    }
+    else {
+      if ((right_arrow - left_arrow) > max_read_len) {
+        max_read_len = right_arrow - left_arrow;
+      }
+      concat += seq.substr(left_arrow, right_arrow - left_arrow) + TERM_CHAR;
+      phred  += qual.substr(left_arrow, right_arrow - left_arrow) + '\0';
+      left_arrow = right_arrow + 1;
+    }
+  }
+  if (seq.size() - left_arrow >= MIN_SUF_LEN)  {
+    concat += seq.substr(left_arrow) + TERM_CHAR;
+    phred  += qual.substr(left_arrow) + '\0';
+  }
+}
+
+void GSA::read_header(string const& header_fname,
+                      vector<string> & h_fnames, vector<string> & t_fnames) {
+  ifstream fin;
+  fin.open(header_fname.c_str());
+  string line;
+  while (getline(fin, line)) {
+    vector<string> fields;
+    split_string(line, ",\t ", fields);
+    if (fields[1] == HEALTHY_DATA) {
+      h_fnames.push_back(fields[0]);
+    } else if (fields[1] == TUMOUR_DATA) {
+      t_fnames.push_back(fields[0]);
+    } else {
+      cout << "Invalid input found in " << header_fname 
+           << ". Valid datatypes are either H or T." 
+           << endl << "Program terminating." << endl;
+      exit(1);
+    }
+    cout << fields[0] << " input as " 
+         << ((fields[1] == HEALTHY_DATA) ? "healthy" : "tumour") << " data "
+         << endl;
+  }
+  fin.close();
+}
+
+//GSA::GSA(vector<string> const& h_fnames, vector<string> const& t_fnames) {
+//  for (string const& f : h_fnames) constructConcat(f);
+//  tsi = concat.size();
+//  for (string const& f : t_fnames) constructConcat(f);
+//  sa = new int64_t[concat.size()];
+//  if (sa == nullptr) {
+//    cout << "no mem for sa allocation." << endl;
+//    exit(1);
+//  }
+//  sa_sz = concat.size();
+//  divsufsort64((uint8_t*)const_cast<char*>(concat.c_str()),sa,sa_sz);
+//  remove_short_suffixes(MIN_SUF);
+//}
+
+void GSA::remove_short_suffixes(int32_t min_suffix_length) {
+  FILE * f = fopen("sa.data", "wb");
+  int64_t n_invalid_elems = 0;
+  // Write array contents with suffixes of length less than
+  // min_suffix_length removed.
+  int64_t * base = sa;
+  for(int64_t * it = sa; it < (sa + sa_sz); it++) { 
+    if (len(*it) <= min_suffix_length) {
+      n_invalid_elems++;
+      fwrite(base, sizeof(int64_t), (it - base), f);
+      base = it+1;
+    }
+  }
+  fwrite(base, sizeof(int64_t), ((sa+sa_sz) - base), f);
+  sa_sz = sa_sz - n_invalid_elems;
+  delete [] sa;
+  sa = new int64_t[sa_sz];
+  fclose(f);
+  int fd  = open("sa.data", O_RDONLY);
+  read(fd, sa, sizeof(int64_t)*sa_sz);
+  fclose(f);
+}
+
+void GSA::constructConcat(string const& fname) {
+  ifstream fin(fname.c_str());
+  string line;
+  while (getline(fin, line)) {
+    concat += line;
+  }
+}
+
+bool GSA::tissuetype(int64_t const i) {
+  return i < tsi;
+}
+
+string::const_iterator GSA::suffix_at(int64_t i) {
+  if (i < 0 || i >= concat.size()) return concat.cend();
+  return concat.cbegin() + i;
+}
+
+string::const_iterator GSA::read_of_suffix(int64_t const i) {
+  if (i < 0 || i >= concat.size()) return concat.cend();
+  return concat.cbegin() + (i - offset(i));
+}
+
+int64_t GSA::offset(int64_t const i) {
+  if (i < 0 || i >= concat.size()) return -1;
+  int64_t offset{-1};
+  for(string::const_iterator it = concat.cbegin() + i; *it != TERM_CHAR; --it) ++offset;
+  return offset;
+}
+
+int64_t GSA::len(int64_t const i) {
+  if (i < 0 || i >= concat.size()) return -1;
+  int64_t len = 1;
+  for (string::const_iterator it = concat.cbegin() + i; *it != TERM_CHAR; ++it) ++len;
+  return len;
+}
+
+void GSA::print_pos() {
+  for (int64_t * it = sa; it < (sa+sa_sz); it++) {
+    cout << *it << "\n";
+  }
+  cout << endl;
+}
+
+void GSA::print_gsa() {
+  for (int64_t *it = sa; it < (sa+sa_sz); it++) {
+    for(string::const_iterator s = suffix_at(*it); 
+        s < concat.cend() && *s != TERM_CHAR; s++) {
+      cout << *s;
+    }
+    cout << "$\n";
+  }
+}
+
+GSA::~GSA() {
+  delete [] sa;
+}
+
+//int64_t GSA::pos_next_read(int64_t i) {
+//  size_t l{0}, r{bsa.size()};
+//  if (i == bsa[bsa.size()-1]) return concat.size();
+//  while (l < r) {
+//    size_t m = (l + r) / 2;
+//    if (i < bsa[m]) r = m;
+//    else if (i > bsa[m]) l = m+1;
+//    else return bsa[m+1];
+//  }
+//  if (l == bsa.size()) return concat.size();
+//  return bsa[l];
+//}
+//
+//int64_t GSA::pos_read(int64_t i) {
+//  size_t l{0}, r{bsa.size()};
+//  while (l < r) {
+//    size_t m = (l+r)/2;
+//    if (i < bsa[m]) r = m;
+//    if (i > bsa[m]) l = m+1;
+//    else return i;
+//  }
+//  l--;
+//  return bsa[l];
+//}
+
+//void GSA::remove_short_suffixes(int32_t min_suffix_length) {
+//  int64_t n_invalid_suffixes{0};
+//  for(int64_t * it = sa; it < (sa+sa_sz); it++) {
+//    if (len(*it) <= min_suffix_length) {
+//      *it = -1;
+//      n_invalid_suffixes++;
+//    }
+//  }
+//  int64_t * short_sa = new int64_t[sa_sz - n_invalid_suffixes];
+//  int64_t * short_it = short_sa;
+//  for(int64_t * it = sa; it < (sa+sa_sz); it++) {
+//    if (*it != -1) {
+//      *short_it = *it;
+//      short_it++;
+//    }
+//  }
+//  delete [] sa;
+//  sa = short_sa;
+//  sa_sz = sa_sz - n_invalid_suffixes;
+//}
