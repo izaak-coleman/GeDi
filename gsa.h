@@ -41,23 +41,30 @@ private:
   void split_string(std::string const & s, std::string const& tokens, std::vector<std::string>
       &split_strings);
 
-  void remove_short_suffixes(int32_t min_suffix_length); 
+  void remove_short_suffixes(int64_t min_suffix_length); 
   // removes suffixes of len() < min_suffix_length
 
 public:
   GSA(std::string const & header_fname); // inits all class members
   ~GSA(); // free sa
-  void print_reads();
-  void print_concat();
-  void print_phreds();
 
   bool tissuetype(int64_t const i); // returns TUMOUR/HEALTHY
   std::string::const_iterator suffix_at(int64_t i);
   std::string::const_iterator read_of_suffix(int64_t const i);
   int64_t offset(int64_t const i);
   int64_t len(int64_t const i);
+  int64_t get_max_read_len();
+  int64_t get_min_suf_size();
+  int64_t read_id_of_suffix(int64_t const i);
+  int64_t sa_element(int64_t pos);
+  int64_t size();
+  std::string get_suffix_string(int64_t i);
+  std::string get_phred_string(int64_t i);
+  // debug funcs
   void print_gsa();
   void print_pos();
-
+  void print_reads();
+  void print_concat();
+  void print_phreds();
 };
 #endif

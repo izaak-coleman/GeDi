@@ -32,6 +32,12 @@ Author: Izaak Coleman
 #include <stdlib.h>
 
 using namespace std;
+void SuffixArray::printSuffixArray(std::string const& filename) { ofstream file(filename);
+  for (Suffix_t & s : SA) {
+    file << reads->returnSuffix(s) << endl;
+  }
+  file.close();
+}
 
 SuffixArray::SuffixArray(ReadPhredContainer &reads, int m, int n):
 N_THREADS(n), MIN_SUFFIX_SIZE(m) {
@@ -575,12 +581,6 @@ void SuffixArray::printSuffixData() {
   }
 }
 
-void SuffixArray::printSuffixArray(std::string const& filename) { ofstream file(filename);
-  for (Suffix_t & s : SA) {
-    file << reads->returnSuffix(s) << endl;
-  }
-  file.close();
-}
 void SuffixArray::printSuffixes() {
   for(Suffix_t s : SA) {
     cout << reads->returnSuffix(s) << endl;

@@ -81,6 +81,7 @@ public:
   // Searches over a binary search array returning the (r,c) where
   // c is less than suffix_index and there is no other (r,c) with a
   // smaller for (suffix_index - c)
+  void printSuffixArray(std::string const& filename);
 
   void free();
   // Deallocated memory allocated for SA
@@ -128,7 +129,6 @@ public:
   // SA copy function used by merge. Returns a pointer to a subsection
   // of SA spanning from indicies [from, to). On the heap
 
-  void printSuffixArray(std::string const& filename);
   // print the suffixes of the suffix array to file
   void printSuffixes();
   // Function prints out the suffix strings assoc. with each element

@@ -11,7 +11,6 @@ Author: Izaak Coleman
 #include <fstream>
 
 #include "SNVIdentifier.h"
-#include "Reads.h"
 #include "SamEntry.h"
 
 
@@ -31,7 +30,6 @@ private:
   const int MIN_MAPQ;       // Discard SamEntries with MAPQ < MIN_MAPQ
   const std::string CHR;    // Discard SamEntries not aligned to CHR
   SNVIdentifier *snvId;     
-  ReadPhredContainer *reads;
 
   void identifySNVs(std::vector<SamEntry*> &alignments);
   // Calls countSNVs() for all valid SamEntries, translating the
@@ -63,7 +61,7 @@ private:
   // Reports the list of SNVs
 
 public:
-    GenomeMapper(SNVIdentifier &snv, ReadPhredContainer &reads,
+    GenomeMapper(SNVIdentifier &snv,
                  std::string outpath, std::string const& basename,
                  std::string const& chr, std::string const& bwt_idx,
                  int min_mapq);

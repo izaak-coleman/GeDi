@@ -48,7 +48,6 @@ MIN_SUFFIX_SIZE(_MIN_SUFFIX_SIZE), N_THREADS(n) {
       for (unsigned int l : lengths) {
         if (l > maxLen) maxLen = l;
       }
-
       if (datafiles[i].tissue == HEALTHY) {
         HealthyReads.insert(HealthyReads.end(), reads.begin(), reads.end());
         HealthyPhreds.insert(HealthyPhreds.end(), phreds.begin(), phreds.end());

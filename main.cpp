@@ -18,12 +18,11 @@ Author: Izaak Coleman
 // testing
 #include <typeinfo>
 
-#include "SuffixArray.h"
 #include "SNVIdentifier.h"
 #include "util_funcs.h"
-#include "Reads.h"
 #include "GenomeMapper.h"
 #include "benchmark.h"
+#include "gsa.h"
 
 
 using namespace std;
@@ -242,15 +241,12 @@ int main(int argc, char** argv)
       return ERROR_IN_COMMAND_LINE; 
     } 
     // Run GeDi
-    struct rusage rss;
+    INITRSS(GeDi);
     START(GeDi);
-    ReadPhredContainer  reads(vm["input_files"].as<string>(),
-                              vm["n_threads"].as<int>());
-    START(DFE_opt1);
-    SuffixArray SA(reads, reads.getMinSuffixSize(), vm["n_threads"].as<int>());
-    COMP(DFE_opt1);
+    GSA gsa(vm["input_files"].as<string>());
 
-    SNVIdentifier snvId(SA, reads, 
+
+    SNVIdentifier snvId(gsa, 
                          vm["min_phred"].as<int>()+BASE33_CONVERSION,
                          vm["gsa1_mct"].as<int>(),
                          vm["gsa2_mct"].as<int>(),
@@ -260,13 +256,14 @@ int main(int argc, char** argv)
                          vm["expected_contamination"].as<double>(),
                          vm["max_allele_freq_of_error"].as<double>());
 
-    GenomeMapper mapper(snvId, reads,
+    GenomeMapper mapper(snvId, 
                         vm["output_path"].as<string>(),
                         vm["output_basename"].as<string>(),
                         vm["chromosome"].as<string>(),
                         vm["bt2-idx"].as<string>(),
                         vm["min_mapq"].as<int>());
     COMP(GeDi);
+    PRINTRSS(GeDi);
     return SUCCESS;
   } 
   catch(std::exception& e) 

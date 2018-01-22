@@ -17,7 +17,6 @@ Author: Izaak Coleman
 
 #include "GenomeMapper.h"
 #include "SNVIdentifier.h"
-#include "Reads.h"
 #include "util_funcs.h"
 #include "SamEntry.h"
 #include "SamEntryGet.h"
@@ -29,7 +28,6 @@ static const int REVERSE_FLAG = 16;
 static const int FORWARD_FLAG = 0;
 
 GenomeMapper::GenomeMapper(SNVIdentifier &snv, 
-                           ReadPhredContainer &reads,
                            string outpath,
                            string const& basename,
                            string const& chr,
@@ -38,7 +36,6 @@ GenomeMapper::GenomeMapper(SNVIdentifier &snv,
                            MIN_MAPQ(min_mapq),
                            CHR(chr) {
 //START(GenomeMapper_GenomeMapper);        
-  this->reads = &reads;
   this->snvId = &snv;
   if (outpath[outpath.size()-1] != '/') outpath += "/";
   string fastqName(outpath + basename + ".fastq"),

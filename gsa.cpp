@@ -20,7 +20,7 @@ KSEQ_INIT(gzFile, gzread);    // initialize .gz parser
 using namespace std;
 static char const TERM_CHAR = '$';
 static char const PHRED_DELIM = '\0';
-static int const MIN_SUF_LEN = 30;
+static int64_t const MIN_SUF_LEN = 30;
 static const          string HEALTHY_DATA = "H";
 static const          string TUMOUR_DATA  = "T";
 static const char     PHRED_20 = '5';
@@ -37,7 +37,20 @@ void GSA::split_string(string const & s, string const & tokens, vector<string> &
   }
 }
 
+int64_t GSA::size() {
+  return sa_sz;
+}
+
+int64_t GSA::get_min_suf_size() {
+  return MIN_SUF_LEN;
+}
+
+
 GSA::GSA(string const& header_fname) {
+  max_read_len = 0;
+  tsi = 0;
+  sa_sz = 0;
+  sa = nullptr;
   vector<string> h_fnames, t_fnames;
   read_header(header_fname, h_fnames, t_fnames);
   for (string const & f : h_fnames) {
@@ -49,29 +62,17 @@ GSA::GSA(string const& header_fname) {
     cout << f << endl;
     load_fq_data(f);
   }
-}
+  cout << "CONCAT: " << concat.size() << endl;
+  cout << "TSI: "  << tsi << endl;
 
-void GSA::print_reads() {
-  size_t base{0}, top{0};
-  while ((top = concat.find(TERM_CHAR, base)) != string::npos) {
-    cout << concat.substr(base, top-base+1) << endl;
-    base = top+1;
+  sa = new int64_t [concat.size()];
+  if (sa == nullptr) {
+    cout << "Memory for suffix array allocation not available. Program terminating" << endl;
+    exit(1);
   }
-}
-void GSA::print_phreds() {
-  size_t base{0}, top{0};
-  while ((top = phred.find(PHRED_DELIM, base)) != string::npos) {
-    cout << phred.substr(base, top-base+1) << endl;
-    base = top+1;
-  }
-}
-
-
-void GSA::print_concat() {
-  for(string::const_iterator it = concat.cbegin(); it < concat.cend(); it++) {
-    cout << *it;
-  }
-  cout << endl;
+  sa_sz = concat.size();
+  divsufsort64((uint8_t*)const_cast<char*>(concat.c_str()), sa, sa_sz);
+  remove_short_suffixes(MIN_SUF_LEN);
 }
 
 void GSA::load_fq_data(string const & fname) {
@@ -125,6 +126,13 @@ void GSA::add_fq_data(void const * vpt) {
     concat += seq.substr(left_arrow) + TERM_CHAR;
     phred  += qual.substr(left_arrow) + '\0';
   }
+  if (seq.size() - left_arrow > max_read_len) {
+    max_read_len = seq.size() - left_arrow;
+  }
+}
+
+int64_t GSA::get_max_read_len() {
+  return max_read_len;
 }
 
 void GSA::read_header(string const& header_fname,
@@ -152,21 +160,8 @@ void GSA::read_header(string const& header_fname,
   fin.close();
 }
 
-//GSA::GSA(vector<string> const& h_fnames, vector<string> const& t_fnames) {
-//  for (string const& f : h_fnames) constructConcat(f);
-//  tsi = concat.size();
-//  for (string const& f : t_fnames) constructConcat(f);
-//  sa = new int64_t[concat.size()];
-//  if (sa == nullptr) {
-//    cout << "no mem for sa allocation." << endl;
-//    exit(1);
-//  }
-//  sa_sz = concat.size();
-//  divsufsort64((uint8_t*)const_cast<char*>(concat.c_str()),sa,sa_sz);
-//  remove_short_suffixes(MIN_SUF);
-//}
 
-void GSA::remove_short_suffixes(int32_t min_suffix_length) {
+void GSA::remove_short_suffixes(int64_t min_suffix_length) {
   FILE * f = fopen("sa.data", "wb");
   int64_t n_invalid_elems = 0;
   // Write array contents with suffixes of length less than
@@ -181,12 +176,13 @@ void GSA::remove_short_suffixes(int32_t min_suffix_length) {
   }
   fwrite(base, sizeof(int64_t), ((sa+sa_sz) - base), f);
   sa_sz = sa_sz - n_invalid_elems;
+  cout << "sa_sz " << size() << endl;
   delete [] sa;
   sa = new int64_t[sa_sz];
   fclose(f);
   int fd  = open("sa.data", O_RDONLY);
   read(fd, sa, sizeof(int64_t)*sa_sz);
-  fclose(f);
+  close(fd);
 }
 
 void GSA::constructConcat(string const& fname) {
@@ -197,7 +193,25 @@ void GSA::constructConcat(string const& fname) {
   }
 }
 
+string GSA::get_suffix_string(int64_t i) {
+  string::const_iterator it = concat.cbegin() + i;
+  string s;
+  while (*it != TERM_CHAR) {s += *it; it++;}
+  return s + TERM_CHAR;
+}
+string GSA::get_phred_string(int64_t i) {
+  string::const_iterator it = phred.cbegin() + i;
+  string s;
+  while(*it != '\0') {s += *it; it++;}
+  return s;
+}
+int64_t GSA::sa_element(int64_t pos) {
+  if (pos < 0 || pos > sa_sz) return -1;
+  return *(sa + pos);
+}
+
 bool GSA::tissuetype(int64_t const i) {
+  if (i < 0 || i >= concat.size()) exit(1);
   return i < tsi;
 }
 
@@ -211,20 +225,29 @@ string::const_iterator GSA::read_of_suffix(int64_t const i) {
   return concat.cbegin() + (i - offset(i));
 }
 
+int64_t GSA::read_id_of_suffix(int64_t const i) {
+  return i - offset(i);
+}
+
 int64_t GSA::offset(int64_t const i) {
   if (i < 0 || i >= concat.size()) return -1;
   int64_t offset{-1};
-  for(string::const_iterator it = concat.cbegin() + i; *it != TERM_CHAR; --it) ++offset;
+  for(string::const_iterator it = concat.cbegin() + i; 
+      it > concat.cbegin() && *it != TERM_CHAR; --it) ++offset;
   return offset;
 }
 
 int64_t GSA::len(int64_t const i) {
   if (i < 0 || i >= concat.size()) return -1;
   int64_t len = 1;
-  for (string::const_iterator it = concat.cbegin() + i; *it != TERM_CHAR; ++it) ++len;
+  for (string::const_iterator it = concat.cbegin() + i; it >= concat.cbegin() && *it != TERM_CHAR; ++it) ++len;
   return len;
 }
 
+GSA::~GSA() {
+  delete [] sa;
+}
+// DEBUG FUNCS
 void GSA::print_pos() {
   for (int64_t * it = sa; it < (sa+sa_sz); it++) {
     cout << *it << "\n";
@@ -241,10 +264,30 @@ void GSA::print_gsa() {
     cout << "$\n";
   }
 }
-
-GSA::~GSA() {
-  delete [] sa;
+void GSA::print_reads() {
+  size_t base{0}, top{0};
+  while ((top = concat.find(TERM_CHAR, base)) != string::npos) {
+    cout << concat.substr(base, top-base+1) << endl;
+    base = top+1;
+  }
 }
+void GSA::print_phreds() {
+  size_t base{0}, top{0};
+  while ((top = phred.find(PHRED_DELIM, base)) != string::npos) {
+    cout << phred.substr(base, top-base+1) << endl;
+    base = top+1;
+  }
+}
+
+
+void GSA::print_concat() {
+  for(string::const_iterator it = concat.cbegin(); it < concat.cend(); it++) {
+    cout << *it;
+  }
+  cout << endl;
+}
+
+
 
 //int64_t GSA::pos_next_read(int64_t i) {
 //  size_t l{0}, r{bsa.size()};

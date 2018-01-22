@@ -14,14 +14,13 @@ Author: Izaak Coleman
 #include <utility>
 
 #include "util_funcs.h"
-#include "Suffix_t.h"
-#include "SuffixArray.h"
+#include "gsa.h"
 
 // read_tag is used for elements of second GSA
 // to determine which cancer specific reads
 // derive from the same genomic locations.
 struct read_tag{
-  unsigned int read_id;
+  int64_t read_id;
   mutable int16_t offset;
   mutable bool orientation;
   unsigned char tissue_type;
@@ -109,6 +108,7 @@ struct bpBlockEqual {
 
 class SNVIdentifier {
 private:
+  GSA * gsa;
   const char MIN_PHRED_QUAL;
   // Read characters with a phred score < MIN_PHRED_QUAL will not contribute to 
   // the consensus sequence.
@@ -136,9 +136,7 @@ private:
   // Aligned positions with > 1 base with a frequency above
   // ALLELIC_FREQ_OF_ERROR are considered low confidence positions and masked.
 
-  ReadPhredContainer *reads;
-  SuffixArray *SA; 
-  std::set<unsigned int> CancerExtraction;
+  std::set<int64_t> CancerExtraction;
   // Elements are indicies of cancer specific reads extracted from the
   // coloured GSA
   std::vector<bpBlock*> SeedBlocks;
@@ -182,7 +180,8 @@ private:
   // extractGroups() then generates seed blocks from second GSA.
 
   void transformBlock(int64_t *from, int64_t *to,
-                      std::vector< std::pair<unsigned int, int64_t> > *bsa,
+                      std::vector< std::pair<int64_t, int64_t> > *bsa,
+                      std::string const& concat,
                       std::vector<read_tag> * block);
   // Transforms a block of the suffix array elements into a block of the
   // second GSA elements.
@@ -223,7 +222,7 @@ private:
   // If search fails, the two regions flanking of the failed search
   // sequence are searched.
 
-  int64_t binarySearch(std::string query);
+  int64_t binarySearch(std::string const & query);
   // Binary search for query in coloured GSA, returns:
   //  -- failed search: -1 
   //  -- success: index of matching suffix
@@ -286,18 +285,22 @@ private:
   // with the healthy consensus sequence character,
   // if the character in either one of the quality strings at the aligned
   // position is not '-'. 
+
+  int64_t computeLCP(std::string::const_iterator a, std::string::const_iterator
+      b);
   
   std::string readTagToString(read_tag const& tag);
+  std::pair<int64_t, int64_t> binarySearch(std::vector< std::pair<int64_t,
+      int64_t> > const & bsa, int64_t sa_pos);
 
   void mergeBlocks(bpBlock & to, bpBlock & from);
 
   void unifyBlocks(std::vector<bpBlock> & seedBlocks);
 
+  void printExtractedCancerReads();
 
 public:
-  SNVIdentifier(SuffixArray &SA, 
-                    ReadPhredContainer &reads, 
-                    char min_phred, int gsa1_mct, int gsa2_mct,
+  SNVIdentifier(GSA & gsa, char min_phred, int gsa1_mct, int gsa2_mct,
                     int coverage_upper_threshold,
                     int n_threads, int max_low_confidence_pos,
                     double econt, double allelic_freq_of_error);
