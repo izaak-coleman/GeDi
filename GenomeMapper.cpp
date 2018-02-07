@@ -10,6 +10,11 @@ Author: Izaak Coleman
 #include <fstream>
 #include <cstdlib>
 #include <boost/regex.hpp>
+#include <sstream>
+#include <zlib.h>
+#include <boost/iostreams/filtering_streambuf.hpp>
+#include <boost/iostreams/copy.hpp>
+#include <boost/iostreams/filter/gzip.hpp>
 
 // COMPUTE RSS
 #include <sys/time.h>
@@ -38,7 +43,7 @@ GenomeMapper::GenomeMapper(SNVIdentifier &snv,
 //START(GenomeMapper_GenomeMapper);        
   this->snvId = &snv;
   if (outpath[outpath.size()-1] != '/') outpath += "/";
-  string fastqName(outpath + basename + ".fastq"),
+  string fastqName(outpath + basename + ".fastq.gz"),
          samName(outpath + basename + ".sam"),
          outName(outpath + basename + ".SNV_results");
 
@@ -74,16 +79,20 @@ GenomeMapper::GenomeMapper(SNVIdentifier &snv,
 
 void GenomeMapper::constructSNVFastqData(string const& fastqName) {
 //START(GenomeMapper_constructSNVFastqData);
-  ofstream snv_fq;
-  snv_fq.open(fastqName.c_str());
+  ofstream fastq_gz(fastqName.c_str());
+  stringstream ss;
   for (int64_t i = 0; i < snvId->cnsPairSize(); i++) {
     consensus_pair &cns_pair = snvId->getPair(i);
     string qual(cns_pair.non_mutated.size(), '!'); 
-    snv_fq << "@" + cns_pair.mutated + "[" + to_string(cns_pair.left_ohang) + 
+    ss << "@" + cns_pair.mutated + "[" + to_string(cns_pair.left_ohang) + 
               ";" + to_string(cns_pair.right_ohang) + "]\n" + cns_pair.non_mutated 
               + "\n+\n" + qual + "\n";
   }
-  snv_fq.close();
+  boost::iostreams::filtering_streambuf<boost::iostreams::input> out;
+  out.push(boost::iostreams::gzip_compressor(boost::iostreams::gzip_params(boost::iostreams::gzip::best_compression)));
+  out.push(ss);
+  boost::iostreams::copy(out,fastq_gz);
+  fastq_gz.close();
 //COMP(GenomeMapper_constructSNVFastqData);
 }
 

@@ -6,7 +6,7 @@ CXX=g++
 COMPFLAGS=-MMD -fopenmp -std=c++11 -O2 -rdynamic
 
 $(EXE):$(OBJ)
-	$(CXX) $(COMPFLAGS) $(OBJ) -o $(EXE) $(LINKDIVSUF) -lz -lboost_regex -lboost_program_options
+	$(CXX) $(COMPFLAGS) $(OBJ) -o $(EXE) $(LINKDIVSUF) -lz -lboost_regex -lboost_program_options -lboost_iostreams
 
 %.o: %.cpp
 	$(CXX) $(COMPFLAGS) $(INCDIVSUF) -c $<
