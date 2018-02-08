@@ -532,18 +532,6 @@ void SNVIdentifier::seedBreakPointBlocks() {
     tw.clear();
   }
   aux_gsa.shrink_to_fit();
-  ofstream of("aux_gsa.txt");
-  for (read_tag const& t : aux_gsa) {
-    string s = gsa->get_suffix_string(t.read_id);
-    if (t.orientation == LEFT){
-      int64_t sz = gsa->len(t.read_id);
-      int64_t off = sz - (t.offset + gsa->get_min_suf_size() + 1);
-      of << reverseComplementString(s).substr(off) << endl;
-    }
-    else {
-      of << s.substr(t.offset) << endl;
-    }
-  }
   cout << "GSA2 size: " << aux_gsa.size()<< endl;
   extractBlocks(aux_gsa);
 
