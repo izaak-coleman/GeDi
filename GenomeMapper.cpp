@@ -89,7 +89,7 @@ void GenomeMapper::constructSNVFastqData(string const& fastqName) {
               + "\n+\n" + qual + "\n";
   }
   boost::iostreams::filtering_streambuf<boost::iostreams::input> out;
-  out.push(boost::iostreams::gzip_compressor(boost::iostreams::gzip_params(boost::iostreams::gzip::best_compression)));
+  out.push(boost::iostreams::gzip_compressor());
   out.push(ss);
   boost::iostreams::copy(out,fastq_gz);
   fastq_gz.close();
