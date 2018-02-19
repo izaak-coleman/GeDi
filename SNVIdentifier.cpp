@@ -417,7 +417,8 @@ int64_t SNVIdentifier::backUpSearchStart(int64_t seedIndex) {
     return seedIndex;
   }
   int64_t startPoint = seedIndex;
-  while (computeLCP(gsa->suffix_at(startPoint), gsa->suffix_at(seedIndex - 1)) 
+  while (computeLCP(gsa->suffix_at(gsa->sa_element(startPoint)),
+        gsa->suffix_at(gsa->sa_element(seedIndex - 1)))
       >= gsa->get_min_suf_size()) {
     seedIndex--;
     if (seedIndex == 0) break;
