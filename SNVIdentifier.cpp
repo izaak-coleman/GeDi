@@ -701,7 +701,7 @@ bool SNVIdentifier::extendBlock(int64_t seed_index,
   }
   if (right_of_seed >= gsa->get_min_suf_size() && seed_index < (gsa->size() - 1)) {
     success_right = getSuffixesFromRight(seed_index, block, orientation, calibration);
-  } 
+  }
   return success_left || success_right;
 //COMP(SNVIdentifier_extendBlock);
 }
@@ -766,7 +766,7 @@ bool SNVIdentifier::getSuffixesFromRight(int64_t seed_index,
       && computeLCP(gsa->suffix_at(gsa->sa_element(right_arrow)), 
                                     gsa->suffix_at(gsa->sa_element(seed_index))) >=
       gsa->get_min_suf_size()) {
-    int64_t sa_pos = gsa->sa_element(seed_index);
+    int64_t sa_pos = gsa->sa_element(right_arrow);
 
     // ...add read pointed to by suffix to the block
     read_tag next_read;
