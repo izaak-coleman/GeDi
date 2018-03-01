@@ -20,6 +20,7 @@ Author: Izaak Coleman
 #include <cstdlib> // exit
 #include <functional>
 #include <algorithm>
+#include <memory>
 
 #include <omp.h>
 
@@ -67,7 +68,7 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
   int64_t elementsPerThread;
   int n_threads;
   if (SeedBlocks.size() < N_THREADS) {
-    omp_set_num_threads(N_THREADS);
+    omp_set_num_threads(1);
     n_threads = 1;
     elementsPerThread = SeedBlocks.size();
   } else {
@@ -78,8 +79,8 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
 
 #pragma omp parallel for 
   for (int i = 0; i < n_threads; i++) {
-    bpBlock** from = (&SeedBlocks[0] + i*elementsPerThread);
-    bpBlock** to;
+    shared_ptr<bpBlock> * from = (&SeedBlocks[0] + i*elementsPerThread);
+    shared_ptr<bpBlock> * to;
     if (i == n_threads - 1) {
       to = (&SeedBlocks[0] + SeedBlocks.size());
     } else {
@@ -98,12 +99,12 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
 //COMP(SNVIdentifier_SNVIdentifier);
 }
 
-void SNVIdentifier::buildConsensusPairsWorker(bpBlock** block, bpBlock** end,
+void SNVIdentifier::buildConsensusPairsWorker(shared_ptr<bpBlock> * block,
+    shared_ptr<bpBlock> * end,
     vector<consensus_pair> & localThreadStore) {
 //START(SNVIdentifier_buildConsensusPairsWorker);
   for(; block < end; block++) {
     if ((*block)->size() > COVERAGE_UPPER_THRESHOLD) {
-      delete *block;
       *block = nullptr;
       continue;
     }
@@ -113,12 +114,10 @@ void SNVIdentifier::buildConsensusPairsWorker(bpBlock** block, bpBlock** end,
 
     extractNonMutatedAlleles(**block, pair);
     if ((*block)->size() > COVERAGE_UPPER_THRESHOLD) {
-      delete *block;
       *block = nullptr;
       continue;
     }
     generateConsensusSequence(HEALTHY, **block, pair.nmut_offset, pair.non_mutated, pair.nqual);
-    delete *block;
     *block = nullptr;
     if (pair.mutated.empty() || pair.non_mutated.empty()) {
       continue;
@@ -631,7 +630,7 @@ void SNVIdentifier::extractBlocks(vector<read_tag> const& gsa) {
     } else {
       to  = (i+1)*elementsPerThread;
     }
-    vector<bpBlock*> threadWork;
+    vector<shared_ptr<bpBlock> > threadWork;
     extractBlocksWorker(from, to, &gsa, threadWork);
 #pragma omp critical
     SeedBlocks.insert(SeedBlocks.end(), threadWork.begin(), threadWork.end());
@@ -642,7 +641,7 @@ void SNVIdentifier::extractBlocks(vector<read_tag> const& gsa) {
 void SNVIdentifier::extractBlocksWorker(int64_t seedIndex,
                                             int64_t to,
                                             vector<read_tag> const* gsa_ptr,
-                                            vector<bpBlock*> & localThreadStore) {
+                                            vector<shared_ptr<bpBlock> > & localThreadStore) {
 //START(SNVIdentifier_extractGroupsWorker);
   vector<read_tag> const& aux_gsa = *gsa_ptr;
   // backup to block start
@@ -656,23 +655,21 @@ void SNVIdentifier::extractBlocksWorker(int64_t seedIndex,
   }
   int64_t extension{seedIndex + 1};
   while (seedIndex < to && seedIndex != aux_gsa.size() - 1) {
-    bpBlock * block;
+    shared_ptr<bpBlock> block;
     while (computeLCP(aux_gsa[seedIndex], aux_gsa[extension]) >= gsa->get_min_suf_size()) {
       extension++;
       if (extension == aux_gsa.size()) break;
     }
     if (extension - seedIndex >= GSA2_MCT) {
-      block = new bpBlock;
+      block.reset(new bpBlock);
       for (int64_t i = seedIndex; i < extension; i++) block->insert(aux_gsa[i]);
-    } else {
-      seedIndex = extension++;
-      continue;
-    }
-    localThreadStore.push_back(block);
+      localThreadStore.push_back(block);
+    } 
     seedIndex = extension++;
   }
   if (seedIndex == aux_gsa.size() - 1 && GSA2_MCT == 1) {
-    bpBlock *block = new bpBlock;
+    shared_ptr<bpBlock> block;
+    block.reset(new bpBlock);
     block->insert(aux_gsa[seedIndex]);
     localThreadStore.push_back(block);
   }

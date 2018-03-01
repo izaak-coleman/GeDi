@@ -12,6 +12,7 @@ Author: Izaak Coleman
 #include <iostream>
 #include <set>
 #include <utility>
+#include <memory>
 
 #include "util_funcs.h"
 #include "gsa.h"
@@ -59,11 +60,12 @@ struct tumourRTCompare{
 };
 
 struct bpBlockCompare{
-  bool operator() (bpBlock const * const a, bpBlock const * const b) {
-    bpBlock::iterator a_it = a->begin();
-    bpBlock::iterator b_it = b->begin();
+  bool operator() (std::shared_ptr<bpBlock const> const a, std::shared_ptr<bpBlock const>
+      const b) {
+    bpBlock::const_iterator a_it = a->cbegin();
+    bpBlock::const_iterator b_it = b->cbegin();
     tumourRTCompare comp;
-    for(; a_it != a->end() && b_it != b->end(); a_it++, b_it++) {
+    for(; a_it != a->cend() && b_it != b->cend(); a_it++, b_it++) {
       if(comp(*a_it, *b_it)) { // a < b, return true
         return true;
       }
@@ -73,10 +75,10 @@ struct bpBlockCompare{
       // else, continue
     }
     // same elements, compare sizes
-    if (a_it == a->end() && b_it == b->end()) { // a == b, return false
+    if (a_it == a->cend() && b_it == b->cend()) { // a == b, return false
       return false;
     }
-    else if (a_it == a->end()) { // a at end, b not, a < b, return true
+    else if (a_it == a->cend()) { // a at end, b not, a < b, return true
       return true;
     }
     else  { // b at end, a not, a < b is false, return false
@@ -93,13 +95,14 @@ struct equalTumourRT {
 
 
 struct bpBlockEqual {
-  bool operator() (bpBlock const * const a, bpBlock const * const b) {
+  bool operator() (std::shared_ptr<bpBlock const> const a,
+      std::shared_ptr<bpBlock const> const b) {
     // first check sizes
     if (a->size() != b->size()) return false;
     // check elems
     equalTumourRT equal;
-    for(bpBlock::iterator a_it = a->begin(), b_it = b->begin();
-        a_it != a->end(); a_it++, b_it++) {
+    for(bpBlock::const_iterator a_it = a->cbegin(), b_it = b->cbegin();
+        a_it != a->cend(); a_it++, b_it++) {
       if (!equal(*a_it,*b_it)) return false;
     }
     return true;
@@ -139,7 +142,7 @@ private:
   std::set<int64_t> CancerExtraction;
   // Elements are indicies of cancer specific reads extracted from the
   // coloured GSA
-  std::vector<bpBlock*> SeedBlocks;
+  std::vector<std::shared_ptr<bpBlock> > SeedBlocks;
   // Elements are initial break point blocks, generated from 
   // seedBreakPointBlocks(), each block consists of the the cancer specific
   // reads covering single location.
@@ -192,13 +195,14 @@ private:
 
   void extractBlocksWorker(int64_t seed_index, int64_t to,
                            std::vector<read_tag> const* gsa_ptr,
-                           std::vector<bpBlock*> & localThreadStore);
+                           std::vector<std::shared_ptr<bpBlock> > & localThreadStore);
   // Passes through the allocated second GSA chunk extracting sets
   // of reads (seed break point blocks), represented by read_tag if:
   // -- Suffixes of reads cover same genomic location
   // -- Number of reads in seed break point block is > GSA_MCT2
 
-  void buildConsensusPairsWorker(bpBlock** block, bpBlock** end,
+  void buildConsensusPairsWorker(std::shared_ptr<bpBlock> * block,
+      std::shared_ptr<bpBlock> * end,
       std::vector<consensus_pair> & localThreadStore);
   // Builds consensus pairs out of an allocated group of seed break point
   // blocks. 
