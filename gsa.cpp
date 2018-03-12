@@ -64,8 +64,7 @@ GSA::GSA(string const& header_fname) {
   }
   cout << "CONCAT: " << concat.size() << endl;
   cout << "TSI: "  << tsi << endl;
-
-  sa = new int64_t [concat.size()];
+  sa = (int64_t*) std::malloc(concat.size()*sizeof(int64_t));
   if (sa == nullptr) {
     cout << "Memory for suffix array allocation not available. Program terminating" << endl;
     exit(1);
@@ -75,6 +74,7 @@ GSA::GSA(string const& header_fname) {
   START(rem_short_suf);
   remove_short_suffixes(MIN_SUF_LEN);
   COMP(rem_short_suf);
+  print_pos();
 }
 
 void GSA::load_fq_data(string const & fname) {
@@ -192,6 +192,7 @@ void GSA::remove_short_suffixes(int64_t min_suffix_length) {
     }
   }
   sa_sz = bubbleRemove(sa, sa_sz, -1);
+  sa = (int64_t*) std::realloc(sa, sa_sz*sizeof(int64_t));
 }
 
 void GSA::constructConcat(string const& fname) {
@@ -254,7 +255,7 @@ int64_t GSA::len(int64_t const i) {
 }
 
 GSA::~GSA() {
-  delete [] sa;
+  std::free(sa);
 }
 // DEBUG FUNCS
 void GSA::print_pos() {
