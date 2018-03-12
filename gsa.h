@@ -44,6 +44,10 @@ private:
   void remove_short_suffixes(int64_t min_suffix_length); 
   // removes suffixes of len() < min_suffix_length
 
+  void xorSwap(int64_t *x, int64_t *y); // swap *x with *y
+
+  int64_t bubbleRemove(int64_t * const a, int64_t const sz, int64_t const invalid);
+
 public:
   GSA(std::string const & header_fname); // inits all class members
   ~GSA(); // free sa

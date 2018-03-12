@@ -72,7 +72,9 @@ GSA::GSA(string const& header_fname) {
   }
   sa_sz = concat.size();
   divsufsort64((uint8_t*)const_cast<char*>(concat.c_str()), sa, sa_sz);
+  START(rem_short_suf);
   remove_short_suffixes(MIN_SUF_LEN);
+  COMP(rem_short_suf);
 }
 
 void GSA::load_fq_data(string const & fname) {
@@ -161,28 +163,35 @@ void GSA::read_header(string const& header_fname,
 }
 
 
+void GSA::xorSwap(int64_t *x, int64_t *y) {
+  if (x != y) {
+    *x ^= *y;
+    *y ^= *x;
+    *x ^= *y;
+  }
+}
+
+int64_t GSA::bubbleRemove(int64_t * const a, int64_t const sz, int64_t const invalid) {
+  int64_t *it = a; ++it;
+  int64_t *base = a;
+  while (it < (a + sz)) {
+    if (*base == invalid) {
+      while (it < (a + sz) && *it == invalid) ++it;
+      if (it >= (a + sz)) break;
+      xorSwap(base, it);
+    }
+    ++base; ++it;
+  }
+  return base - a;
+}
+
 void GSA::remove_short_suffixes(int64_t min_suffix_length) {
-  FILE * f = fopen("sa.data", "wb");
-  int64_t n_invalid_elems = 0;
-  // Write array contents with suffixes of length less than
-  // min_suffix_length removed.
-  int64_t * base = sa;
-  for(int64_t * it = sa; it < (sa + sa_sz); it++) { 
+  for (int64_t * it = sa; it < (sa + sa_sz); ++it) {
     if (len(*it) <= min_suffix_length) {
-      n_invalid_elems++;
-      fwrite(base, sizeof(int64_t), (it - base), f);
-      base = it+1;
+      *it = -1;
     }
   }
-  fwrite(base, sizeof(int64_t), ((sa+sa_sz) - base), f);
-  sa_sz = sa_sz - n_invalid_elems;
-  cout << "sa_sz " << size() << endl;
-  delete [] sa;
-  sa = new int64_t[sa_sz];
-  fclose(f);
-  int fd  = open("sa.data", O_RDONLY);
-  read(fd, sa, sizeof(int64_t)*sa_sz);
-  close(fd);
+  sa_sz = bubbleRemove(sa, sa_sz, -1);
 }
 
 void GSA::constructConcat(string const& fname) {
@@ -334,3 +343,27 @@ void GSA::print_concat() {
 //  sa = short_sa;
 //  sa_sz = sa_sz - n_invalid_suffixes;
 //}
+//void GSA::remove_short_suffixes(int64_t min_suffix_length) {
+//  FILE * f = fopen("sa.data", "wb");
+//  int64_t n_invalid_elems = 0;
+//  // Write array contents with suffixes of length less than
+//  // min_suffix_length removed.
+//  int64_t * base = sa;
+//  for(int64_t * it = sa; it < (sa + sa_sz); it++) { 
+//    if (len(*it) <= min_suffix_length) {
+//      n_invalid_elems++;
+//      fwrite(base, sizeof(int64_t), (it - base), f);
+//      base = it+1;
+//    }
+//  }
+//  fwrite(base, sizeof(int64_t), ((sa+sa_sz) - base), f);
+//  sa_sz = sa_sz - n_invalid_elems;
+//  cout << "sa_sz " << size() << endl;
+//  delete [] sa;
+//  sa = new int64_t[sa_sz];
+//  fclose(f);
+//  int fd  = open("sa.data", O_RDONLY);
+//  read(fd, sa, sizeof(int64_t)*sa_sz);
+//  close(fd);
+//}
+//
