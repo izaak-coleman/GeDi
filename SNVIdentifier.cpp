@@ -22,6 +22,7 @@ Author: Izaak Coleman
 #include <algorithm>
 #include <memory>
 
+#include <zlib.h>
 #include <omp.h>
 
 #include "divsufsort64.h"
@@ -34,7 +35,9 @@ using namespace std;
 
 const char TERM = '$';
 
-SNVIdentifier::SNVIdentifier(GSA &_gsa, 
+SNVIdentifier::SNVIdentifier(GSA &_gsa,
+                                     string outpath,
+                                     string const & basename,
                                      char mpq, int g1, int g2, int cut,
                                      int t, int mlcp, double e, double a):
                                      MIN_PHRED_QUAL(mpq), 
@@ -47,6 +50,7 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
                                      ALLELIC_FREQ_OF_ERROR(a) {
 //START(SNVIdentifier_SNVIdentifier);
   if (GSA1_MCT > GSA2_MCT) GSA2_MCT = GSA1_MCT;
+  if (outpath[outpath.size()-1] != '/') outpath += "/";
   gsa = &_gsa;    
   cout << "READ_LENGTH: " << gsa->get_max_read_len() << endl;
   cout << "GSA1_MCT : " << GSA1_MCT  << endl;
@@ -77,6 +81,7 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
     elementsPerThread = SeedBlocks.size() / n_threads;
   }
 
+  string consensus_pairs;
 #pragma omp parallel for 
   for (int i = 0; i < n_threads; i++) {
     shared_ptr<bpBlock> * from = (&SeedBlocks[0] + i*elementsPerThread);
@@ -86,22 +91,39 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
     } else {
       to = (&SeedBlocks[0] + (i+1)*elementsPerThread);
     }
-    vector<consensus_pair> threadWork;
+    string threadWork;
     buildConsensusPairsWorker(from, to, threadWork);
 #pragma omp critical 
     {
-      consensus_pairs.insert(consensus_pairs.end(), threadWork.begin(), threadWork.end());
-      threadWork.clear();
+      consensus_pairs += threadWork;
     }
   }
   COMP(CNS_construction);
   cout << "<<<<<<<<<<<<<<Finished break point block construction" << endl;
+  cout << "Writing consensus pairs as fastq" << endl;
+  writeConsensusPairs(consensus_pairs, outpath + basename + ".fastq.gz");
 //COMP(SNVIdentifier_SNVIdentifier);
 }
 
+void SNVIdentifier::writeConsensusPairs(string const & consensus_pairs, string const & fname) {
+  cout << consensus_pairs.size() << endl;
+  gzFile outfile = gzopen(fname.c_str(), "wb");
+  int64_t src_sz = consensus_pairs.size();
+  int chunk = 0x4000;
+  char * src = const_cast<char*>(consensus_pairs.c_str());
+  char * it = src;
+  for (; (it + chunk)  < (src + src_sz); it += chunk) {
+    if(gzwrite(outfile, it, chunk) != chunk) {
+      cout << "WRITE ERROR" << endl;
+    }
+  }
+  cout << ((src + src_sz) - it)*sizeof(*src) << endl;
+  gzwrite(outfile, it, ((src + src_sz) - it));
+  gzclose(outfile);
+}
 void SNVIdentifier::buildConsensusPairsWorker(shared_ptr<bpBlock> * block,
     shared_ptr<bpBlock> * end,
-    vector<consensus_pair> & localThreadStore) {
+    string & threadWork) {
 //START(SNVIdentifier_buildConsensusPairsWorker);
   for(; block < end; block++) {
     if ((*block)->size() > COVERAGE_UPPER_THRESHOLD) {
@@ -131,13 +153,13 @@ void SNVIdentifier::buildConsensusPairsWorker(shared_ptr<bpBlock> * block,
       continue;
     }
     maskLowQualityPositions(pair);
-    localThreadStore.push_back(pair);
+    string qual(pair.non_mutated.size(), '!');
+    threadWork += "@" + pair.mutated + "[" + to_string(pair.left_ohang) + 
+               ";" + to_string(pair.right_ohang) + "]\n" + pair.non_mutated 
+               + "\n+\n" + qual + "\n";
   }
 }
 
-void SNVIdentifier::free() {
-  consensus_pairs.clear();
-}
 
 bool SNVIdentifier::excessLowQuality(consensus_pair & pair) {
 //START(SNVIdentifier_excessLowQuality);
@@ -1034,13 +1056,6 @@ int64_t SNVIdentifier::getSize() {
   return BreakPointBlocks.size();
 }
 
-consensus_pair & SNVIdentifier::getPair(int64_t i) {
-  return consensus_pairs[i];
-}
-
-int64_t SNVIdentifier::cnsPairSize() {
-  return consensus_pairs.size();
-}
 
 // end of file
 /*

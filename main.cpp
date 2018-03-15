@@ -247,6 +247,8 @@ int main(int argc, char** argv)
 
 
     SNVIdentifier snvId(gsa, 
+                         vm["output_path"].as<string>(),
+                         vm["output_basename"].as<string>(),
                          vm["min_phred"].as<int>()+BASE33_CONVERSION,
                          vm["gsa1_mct"].as<int>(),
                          vm["gsa2_mct"].as<int>(),

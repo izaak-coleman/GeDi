@@ -74,7 +74,6 @@ GSA::GSA(string const& header_fname) {
   START(rem_short_suf);
   remove_short_suffixes(MIN_SUF_LEN);
   COMP(rem_short_suf);
-  print_pos();
 }
 
 void GSA::load_fq_data(string const & fname) {

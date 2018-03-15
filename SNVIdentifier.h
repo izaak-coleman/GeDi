@@ -153,8 +153,6 @@ private:
   // healthy reads that cover the same location, along with the relative alignment
   // information, used to align each read against its own block.
 
-  std::vector<consensus_pair> consensus_pairs;
-  // Elements are consensus sequences generated from break point blocks.
 
   int64_t backUpSearchStart(int64_t seed_index);
   // The worker threads that seed break point blocks from the second gsa
@@ -203,9 +201,11 @@ private:
 
   void buildConsensusPairsWorker(std::shared_ptr<bpBlock> * block,
       std::shared_ptr<bpBlock> * end,
-      std::vector<consensus_pair> & localThreadStore);
+      std::string & threadWork);
   // Builds consensus pairs out of an allocated group of seed break point
   // blocks. 
+
+  void writeConsensusPairs(std::string const & consensus_pairs, std::string const & fname);
 
   void generateConsensusSequence(bool tissue, bpBlock const& block,
       int & cns_offset, std::string & cns, std::string & qual);
@@ -304,16 +304,14 @@ private:
   void printExtractedCancerReads();
 
 public:
-  SNVIdentifier(GSA & gsa, char min_phred, int gsa1_mct, int gsa2_mct,
+  SNVIdentifier(GSA & gsa, std::string outpath, 
+                    std::string const& basename, 
+                    char min_phred, int gsa1_mct, int gsa2_mct,
                     int coverage_upper_threshold,
                     int n_threads, int max_low_confidence_pos,
                     double econt, double allelic_freq_of_error);
 
   int64_t getSize();
-  consensus_pair & getPair(int64_t i);
-  int64_t cnsPairSize();
-  void free();
-  // Deallocates memosy allocated for consensus_pairs
 
 };
 

@@ -10,11 +10,6 @@ Author: Izaak Coleman
 #include <fstream>
 #include <cstdlib>
 #include <boost/regex.hpp>
-#include <sstream>
-#include <zlib.h>
-#include <boost/iostreams/filtering_streambuf.hpp>
-#include <boost/iostreams/copy.hpp>
-#include <boost/iostreams/filter/gzip.hpp>
 
 // COMPUTE RSS
 #include <sys/time.h>
@@ -47,9 +42,6 @@ GenomeMapper::GenomeMapper(SNVIdentifier &snv,
          samName(outpath + basename + ".sam"),
          outName(outpath + basename + ".SNV_results");
 
-  cout << "Writing fastq" << endl;
-  constructSNVFastqData(fastqName);
-  snvId->free();
   cout << "Aligning consensus pairs with Bowtie2" << endl;
   string command_aln("~/GeDi/bowtie2-2.3.1/bowtie2 -p 16 -x " + bwt_idx + " -U " +
                      fastqName + " -S " + samName);
@@ -75,25 +67,6 @@ GenomeMapper::GenomeMapper(SNVIdentifier &snv,
   getrusage(RUSAGE_SELF, &rss);
   cout << "RSS after outputSNVToUser()" << rss.ru_maxrss << endl;
 //COMP(GenomeMapper_GenomeMapper);  
-}
-
-void GenomeMapper::constructSNVFastqData(string const& fastqName) {
-//START(GenomeMapper_constructSNVFastqData);
-  ofstream fastq_gz(fastqName.c_str());
-  stringstream ss;
-  for (int64_t i = 0; i < snvId->cnsPairSize(); i++) {
-    consensus_pair &cns_pair = snvId->getPair(i);
-    string qual(cns_pair.non_mutated.size(), '!'); 
-    ss << "@" + cns_pair.mutated + "[" + to_string(cns_pair.left_ohang) + 
-              ";" + to_string(cns_pair.right_ohang) + "]\n" + cns_pair.non_mutated 
-              + "\n+\n" + qual + "\n";
-  }
-  boost::iostreams::filtering_streambuf<boost::iostreams::input> out;
-  out.push(boost::iostreams::gzip_compressor());
-  out.push(ss);
-  boost::iostreams::copy(out,fastq_gz);
-  fastq_gz.close();
-//COMP(GenomeMapper_constructSNVFastqData);
 }
 
 void GenomeMapper::parseSamFile(vector<SamEntry*> &alignments, string filename) {

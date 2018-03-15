@@ -38,16 +38,6 @@ private:
   void countSNVs(SamEntry* &alignment, int left);
   // Compares consensus sequences identifying SNVs.
 
-  void constructSNVFastqData(std::string const& fastqName);
-  // Builds the fastq file from the consensus pairs. Fastq file will
-  // be used to align against the reference genome.
-  // Fastq element structure:
-  //
-  // @TumourConsensusSequence[left_ohang;right_ohang]
-  // HealthyConsensusSequence
-  // +
-  // DummyQualityString (!)'s of length HealthyConsensusSequence
-
   void parseSamFile(std::vector<SamEntry*> &alignments, std::string filename);
   // Builds list of SamEntries from sam file
 
