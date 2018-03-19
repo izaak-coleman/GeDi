@@ -78,6 +78,9 @@ public:
   bool deleted();
   // Returns true if free() was called on object, false otherwise
 
+  bool indel();
+  // Returns true of alignment contains indel relative to ref.
+
   void set(int k, int v) {
     switch (k) {
       case 1:  flag        = v; break;

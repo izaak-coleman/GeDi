@@ -90,3 +90,7 @@ bool SamEntry::deleted() {
   return del;
 }
 
+bool SamEntry::indel() {
+  return (cigar.find('D') != string::npos) || (cigar.find('I') != string::npos);
+}
+

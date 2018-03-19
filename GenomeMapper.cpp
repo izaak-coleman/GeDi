@@ -20,6 +20,7 @@ Author: Izaak Coleman
 #include "util_funcs.h"
 #include "SamEntry.h"
 #include "SamEntryGet.h"
+#include "CigarParser.h"
 #include "benchmark.h"
 
 using namespace std;
@@ -50,12 +51,9 @@ GenomeMapper::GenomeMapper(SNVIdentifier &snv,
   cout << "Parsing sam" << endl;
 
   struct rusage rss;
-  getrusage(RUSAGE_SELF, &rss);
-  cout << "RSS before parseSamFile()" << rss.ru_maxrss << endl;
 
   parseSamFile(alignments, samName);
   getrusage(RUSAGE_SELF, &rss);
-  cout << "RSS after parseSamFile()" << rss.ru_maxrss << endl;
 
   cout << "Identifying SNV" << endl;
   identifySNVs(alignments);
@@ -98,17 +96,65 @@ void GenomeMapper::identifySNVs(vector<SamEntry*> &alignments) {
 //START(GenomeMapper_identifySNVs);
   for (SamEntry* &entry : alignments) {
     if(get<int>(SamEntry::FLAG, entry) == FORWARD_FLAG) {
-      countSNVs(entry, get<int>(SamEntry::LEFT_OHANG, entry));
+      CigarParser cp(get<string>(SamEntry::CIGAR, entry));
+      countSNVs(entry, get<int>(SamEntry::LEFT_OHANG, entry), cp);
     }
     else if (get<int>(SamEntry::FLAG, entry) == REVERSE_FLAG) {
+      CigarParser cp(get<string>(SamEntry::CIGAR, entry));
       entry->set(SamEntry::HDR, reverseComplementString(get<string>(SamEntry::HDR, entry))); 
-      countSNVs(entry, get<int>(SamEntry::RIGHT_OHANG, entry)); // invert overhangs due to rev comp
+      countSNVs(entry, get<int>(SamEntry::RIGHT_OHANG, entry), cp); // invert overhangs due to rev comp
     }
   }
 //COMP(GenomeMapper_identifySNVs);
 }
 
-void GenomeMapper::countSNVs(SamEntry * &alignment, int ohang) {
+char GenomeMapper::operationOfSNV(int const SNVPos, CigarParser const & cp) {
+  int64_t idx = 0;
+  for(int64_t count = 0; count < SNVPos && idx < cp.size(); ++idx) {
+    char op = cp.operation_at(idx);
+    if (op == 'M' || op == 'I') {
+      count += cp.length_at(idx);
+    }
+  }
+  return cp.operation_at(idx-1);
+}
+
+int GenomeMapper::calibrateWithCIGAR(int SNVPos, CigarParser const & cp) {
+  SNVPos++; // change to base-1 index in line with CIGAR
+  if (cp.operation_at(0) == 'M' && cp.length_at(0) >= SNVPos) {
+    // Then CIGAR has no effect.
+    return SNVPos-1;  // -1 returns base-0 index
+  }
+  if (operationOfSNV(SNVPos, cp) == 'I') { 
+    // Then the SNV is located within an insertion that is not found within
+    // the reference genome. Accordingly, no logical position of the SNV
+    // exists.
+    return -1;
+  }
+
+  // Otherwise, calibrate SNVPos according to CIGAR
+  int64_t origSNVPos = SNVPos;
+  for (int64_t i = 0, count = 0; count < origSNVPos && i < cp.size(); ++i) {
+    char op = cp.operation_at(i);
+    if (op == 'I') {
+      SNVPos -= cp.length_at(i);
+    }
+    else if (op == 'D') {
+      SNVPos += cp.length_at(i);
+    }
+
+    // count incrementation ensures operations beyond the original
+    // SNV position are not incorrectly calibrated for.
+    if (op == 'M' || op == 'I') {
+      count += cp.length_at(i);
+    }
+  }
+  return SNVPos-1; // -1 returns base-0 index
+}
+
+
+void GenomeMapper::countSNVs(SamEntry * &alignment, int ohang, CigarParser const
+    & cp) {
 //START(GenomeMapper_countSNVs);
   string mutated = get<string>(SamEntry::HDR, alignment);
   string nonMutated = get<string>(SamEntry::SEQ, alignment);
@@ -121,17 +167,16 @@ void GenomeMapper::countSNVs(SamEntry * &alignment, int ohang) {
       return;
     }
   }
-  // SNV at start
   if (mutated[0] != nonMutated[0 + ohang] &&
       mutated[1] == nonMutated[1 + ohang]) {
-      alignment->snv_push_back(0); 
+      alignment->snv_push_back(calibrateWithCIGAR(0 + ohang, cp)); 
       noSNVs = false;
   }
   // SNV at end 
   int cnsLen = mutated.size();
   if (mutated[cnsLen-1] != nonMutated[cnsLen-1 + ohang] &&
       mutated[cnsLen-2] == nonMutated[cnsLen-2 + ohang]) {
-      alignment->snv_push_back(cnsLen-1);
+      alignment->snv_push_back(calibrateWithCIGAR(cnsLen-1 + ohang, cp));
       noSNVs = false;
   }
   // SNV in body
@@ -139,7 +184,7 @@ void GenomeMapper::countSNVs(SamEntry * &alignment, int ohang) {
     if (mutated[i-1] == nonMutated[i-1 + ohang] &&
         mutated[i] != nonMutated[i + ohang] &&
         mutated[i+1] == nonMutated[i+1 + ohang] ) {
-      alignment->snv_push_back(i);
+      alignment->snv_push_back(calibrateWithCIGAR(i + ohang, cp));
       noSNVs = false;
     }
   }
@@ -179,9 +224,9 @@ void GenomeMapper::outputSNVToUser(vector<SamEntry*> &alignments, string outName
 
       single_snv snv;
       snv.chr = get<string>(SamEntry::RNAME, entry);
-      snv.position = (get<int>(SamEntry::POS, entry) + snv_index + overhang); // location of snv
-      snv.healthy_base = get<string>(SamEntry::SEQ, entry)[snv_index + overhang];
-      snv.mutation_base = get<string>(SamEntry::HDR, entry)[snv_index];
+      snv.position = (get<int>(SamEntry::POS, entry) + snv_index); // location of snv
+      snv.healthy_base = get<string>(SamEntry::SEQ, entry)[snv_index];
+      snv.mutation_base = get<string>(SamEntry::HDR, entry)[snv_index - overhang];
       separate_snvs.push_back(snv);
     }
     delete entry;

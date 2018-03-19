@@ -12,6 +12,7 @@ Author: Izaak Coleman
 
 #include "SNVIdentifier.h"
 #include "SamEntry.h"
+#include "CigarParser.h"
 
 
 // In order to sort the mulitple potential SNVs present in a 
@@ -35,7 +36,7 @@ private:
   // Calls countSNVs() for all valid SamEntries, translating the
   // consensus sequence complementarity to that of the reference genome.
 
-  void countSNVs(SamEntry* &alignment, int left);
+  void countSNVs(SamEntry* &alignment, int left, CigarParser const & cp);
   // Compares consensus sequences identifying SNVs.
 
   void parseSamFile(std::vector<SamEntry*> &alignments, std::string filename);
@@ -49,6 +50,16 @@ private:
 
   void outputSNVToUser(std::vector<SamEntry*> &alignments, std::string reportFilename);
   // Reports the list of SNVs
+
+  char operationOfSNV(int const SNVpos, CigarParser const & cp);
+  // Returns the CIGAR operation in which the SNV at SNVpos is located.
+
+  int calibrateWithCIGAR(int SNVpos, CigarParser const & cp);
+  // Calibrates SNVPos according to the insertion/deletion information
+  // contained within CIGAR, such that the SNVPos is referencing the 
+  // correct reference genome index.
+
+  
 
 public:
     GenomeMapper(SNVIdentifier &snv,

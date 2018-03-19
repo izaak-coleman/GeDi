@@ -1,4 +1,4 @@
-OBJ=main.o util_funcs.o SNVIdentifier.o gsa.o GenomeMapper.o SamEntry.o
+OBJ=main.o util_funcs.o SNVIdentifier.o gsa.o GenomeMapper.o SamEntry.o CigarParser.o
 LINKDIVSUF=-Wl,-R libdivsufsort-master/build/lib/  -L libdivsufsort-master/build/lib/ -ldivsufsort64
 INCDIVSUF=-I libdivsufsort-master/build/include -ldivsufsort64
 EXE=GeDi
