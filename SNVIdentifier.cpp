@@ -153,11 +153,37 @@ void SNVIdentifier::buildConsensusPairsWorker(shared_ptr<bpBlock> * block,
       continue;
     }
     maskLowQualityPositions(pair);
+
+    if (noSNV(pair)) {
+      continue;
+    }
     string qual(pair.non_mutated.size(), '!');
     threadWork += "@" + pair.mutated + "[" + to_string(pair.left_ohang) + 
                ";" + to_string(pair.right_ohang) + "]\n" + pair.non_mutated 
                + "\n+\n" + qual + "\n";
   }
+}
+
+bool SNVIdentifier::noSNV(consensus_pair const & pair) {
+  if (pair.mutated[0] != pair.non_mutated [0 + pair.left_ohang] &&
+      pair.mutated[1] == pair.non_mutated[1 + pair.left_ohang]) {
+    return false;
+  }
+  // SNV at end 
+  int cnsLen = pair.mutated.size();
+  if (pair.mutated[cnsLen-1] != pair.non_mutated[cnsLen-1 + pair.left_ohang] &&
+      pair.mutated[cnsLen-2] == pair.non_mutated[cnsLen-2 + pair.left_ohang]) {
+      return false;
+  }
+  // SNV in body
+  for (int i=1; i < pair.mutated.size() - 1; i++) {
+    if (pair.mutated[i-1] == pair.non_mutated[i-1 + pair.left_ohang] &&
+        pair.mutated[i] != pair.non_mutated[i + pair.left_ohang] &&
+        pair.mutated[i+1] == pair.non_mutated[i+1 + pair.left_ohang] ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 

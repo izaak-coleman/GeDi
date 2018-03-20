@@ -290,6 +290,10 @@ private:
   // if the character in either one of the quality strings at the aligned
   // position is not '-'. 
 
+  bool noSNV(consensus_pair const & pair);
+  // Returns true if pair.mutated and pair.non_mutated do not contain
+  // a mismatch representative of an SNV. 
+
   int64_t computeLCP(std::string::const_iterator a, std::string::const_iterator
       b);
   
