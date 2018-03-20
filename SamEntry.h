@@ -33,8 +33,19 @@ public:
   std::string seq;
   std::string qual;
 
-  // SNV index
+  /* For the following three vectors SNVLocations[i] specifies an SNV at
+   * genome location pos + SNVLocations[i], for which the healthy dataset
+   * allele is nonMutatedBases[i], and the tumour dataset allele is
+   * mutatedBases[i].
+   */
+
+  // SNV Positions relative to healthy consensus sequence
   std::vector<int> SNVLocations;
+  // List of mutated SNV allele
+  std::vector<char> mutatedBases;
+  // LIst of non-mutated SNV allele
+  std::vector<char> nonMutatedBases;
+
 
   // delete switch
   bool del;
@@ -58,16 +69,6 @@ public:
 
   SamEntry(std::string const& line); 
   // Separates fields, discards any non compulsory fields. 
-
-
-
-  int snvLocSize(); 
-  // number of SNVs identified in the sam entry
-
-  int snvLocation(int idx);
-  // returns the location of an SNV 
-
-  void snv_push_back(int v);
 
   bool containsIndel(); 
   // returns true if CIGAR string contains 'I' or 'D', false otherwise.

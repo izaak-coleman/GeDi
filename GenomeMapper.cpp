@@ -169,14 +169,18 @@ void GenomeMapper::countSNVs(SamEntry * &alignment, int ohang, CigarParser const
   }
   if (mutated[0] != nonMutated[0 + ohang] &&
       mutated[1] == nonMutated[1 + ohang]) {
-      alignment->snv_push_back(calibrateWithCIGAR(0 + ohang, cp)); 
+      alignment->mutatedBases.push_back(mutated[0]);
+      alignment->nonMutatedBases.push_back(nonMutated[0+ohang]);
+      alignment->SNVLocations.push_back(calibrateWithCIGAR(0 + ohang, cp)); 
       noSNVs = false;
   }
   // SNV at end 
   int cnsLen = mutated.size();
   if (mutated[cnsLen-1] != nonMutated[cnsLen-1 + ohang] &&
       mutated[cnsLen-2] == nonMutated[cnsLen-2 + ohang]) {
-      alignment->snv_push_back(calibrateWithCIGAR(cnsLen-1 + ohang, cp));
+      alignment->mutatedBases.push_back(mutated[cnsLen-1]);
+      alignment->nonMutatedBases.push_back(nonMutated[cnsLen-1+ohang]);
+      alignment->SNVLocations.push_back(calibrateWithCIGAR(cnsLen-1 + ohang, cp));
       noSNVs = false;
   }
   // SNV in body
@@ -184,7 +188,10 @@ void GenomeMapper::countSNVs(SamEntry * &alignment, int ohang, CigarParser const
     if (mutated[i-1] == nonMutated[i-1 + ohang] &&
         mutated[i] != nonMutated[i + ohang] &&
         mutated[i+1] == nonMutated[i+1 + ohang] ) {
-      alignment->snv_push_back(calibrateWithCIGAR(i + ohang, cp));
+      alignment->mutatedBases.push_back(mutated[i]);
+      alignment->nonMutatedBases.push_back(nonMutated[i+ohang]);
+      alignment->SNVLocations.push_back(calibrateWithCIGAR(i + ohang, cp));
+
       noSNVs = false;
     }
   }
@@ -212,21 +219,13 @@ void GenomeMapper::outputSNVToUser(vector<SamEntry*> &alignments, string outName
     if (entry == nullptr) {
       continue;
     }
-    for(int i=0; i < entry->snvLocSize(); i++) {
-      int snv_index = entry->snvLocation(i);
-      int overhang = 0;
-      if (get<int>(SamEntry::FLAG, entry) == FORWARD_FLAG) {
-        overhang = get<int>(SamEntry::LEFT_OHANG, entry);
-      }
-      else if (get<int>(SamEntry::FLAG, entry) == REVERSE_FLAG) {
-        overhang = get<int>(SamEntry::RIGHT_OHANG, entry);
-      }
-
+    for(int i=0; i < entry->SNVLocations.size(); i++) {
+      int alignment_index = get<int>(SamEntry::POS, entry);
       single_snv snv;
       snv.chr = get<string>(SamEntry::RNAME, entry);
-      snv.position = (get<int>(SamEntry::POS, entry) + snv_index); // location of snv
-      snv.healthy_base = get<string>(SamEntry::SEQ, entry)[snv_index];
-      snv.mutation_base = get<string>(SamEntry::HDR, entry)[snv_index - overhang];
+      snv.position = alignment_index + entry->SNVLocations[i];;
+      snv.healthy_base = entry->nonMutatedBases[i];
+      snv.mutation_base = entry->mutatedBases[i];
       separate_snvs.push_back(snv);
     }
     delete entry;

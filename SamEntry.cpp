@@ -62,12 +62,7 @@ SamEntry::SamEntry(string const& entry) {
   right_ohang = stoi(header_subs[1]);
 }
 
-void SamEntry::snv_push_back(int v) {
-  SNVLocations.push_back(v);
-}
 
-int SamEntry::snvLocSize() {return SNVLocations.size();}
-int SamEntry::snvLocation(int idx) {return SNVLocations[idx];}
 bool SamEntry::containsIndel() {
   if (cigar.find('i') || cigar.find('d')) {
     return true;
