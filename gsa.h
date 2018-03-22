@@ -23,6 +23,7 @@ class GSA {
      of a given suffix to be derived by equality comparison against tsi.
     */
 
+  int N_THREADS;
   int64_t sa_sz; // size of suffix array
   int64_t tsi; // index in concat at which data transitions from H to T
   std::string concat; // = HT
@@ -49,7 +50,7 @@ private:
   int64_t bubbleRemove(int64_t * const a, int64_t const sz, int64_t const invalid);
 
 public:
-  GSA(std::string const & header_fname); // inits all class members
+  GSA(std::string const & header_fname, int t); // inits all class members
   ~GSA(); // free sa
 
   bool tissuetype(int64_t const i); // returns TUMOUR/HEALTHY

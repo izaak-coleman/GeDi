@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <zlib.h>
+#include <omp.h>
 
 #include "kseq.h"
 #include "gsa.h"
@@ -46,7 +47,8 @@ int64_t GSA::get_min_suf_size() {
 }
 
 
-GSA::GSA(string const& header_fname) {
+GSA::GSA(string const& header_fname, int t) {
+  N_THREADS = t;
   max_read_len = 0;
   tsi = 0;
   sa_sz = 0;
@@ -70,7 +72,9 @@ GSA::GSA(string const& header_fname) {
     exit(1);
   }
   sa_sz = concat.size();
+  START(p_gsa);
   divsufsort64((uint8_t*)const_cast<char*>(concat.c_str()), sa, sa_sz);
+  COMP(p_gsa);
   START(rem_short_suf);
   remove_short_suffixes(MIN_SUF_LEN);
   COMP(rem_short_suf);
@@ -185,9 +189,23 @@ int64_t GSA::bubbleRemove(int64_t * const a, int64_t const sz, int64_t const inv
 }
 
 void GSA::remove_short_suffixes(int64_t min_suffix_length) {
-  for (int64_t * it = sa; it < (sa + sa_sz); ++it) {
-    if (len(*it) <= min_suffix_length) {
-      *it = -1;
+  omp_set_num_threads(N_THREADS);
+  int64_t elementsPerThread = sa_sz / N_THREADS;
+#pragma omp parallel for
+  for (int i = 0; i < N_THREADS; i++) {
+    int64_t* from = (sa + i*elementsPerThread);
+    int64_t* to = nullptr;
+    if (i == N_THREADS - 1) {
+      to = (sa + sa_sz);
+    }
+    else {
+      to = (sa + (i+1)*elementsPerThread);
+    }
+    while (from < to) {
+      if (len(*from) <= min_suffix_length) {
+        *from = -1;
+      }
+      from++;
     }
   }
   sa_sz = bubbleRemove(sa, sa_sz, -1);

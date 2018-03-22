@@ -243,7 +243,7 @@ int main(int argc, char** argv)
     // Run GeDi
     INITRSS(GeDi);
     START(GeDi);
-    GSA gsa(vm["input_files"].as<string>());
+    GSA gsa(vm["input_files"].as<string>(), vm["n_threads"].as<int>());
 
 
     SNVIdentifier snvId(gsa, 
