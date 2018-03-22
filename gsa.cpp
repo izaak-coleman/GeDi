@@ -267,7 +267,7 @@ int64_t GSA::offset(int64_t const i) {
 int64_t GSA::len(int64_t const i) {
   if (i < 0 || i >= concat.size()) return -1;
   int64_t len = 1;
-  for (string::const_iterator it = concat.cbegin() + i; it >= concat.cbegin() && *it != TERM_CHAR; ++it) ++len;
+  for (string::const_iterator it = concat.cbegin() + i; it < concat.cend() && *it != TERM_CHAR; ++it) ++len;
   return len;
 }
 
