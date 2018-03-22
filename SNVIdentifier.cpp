@@ -52,6 +52,7 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
   if (GSA1_MCT > GSA2_MCT) GSA2_MCT = GSA1_MCT;
   if (outpath[outpath.size()-1] != '/') outpath += "/";
   gsa = &_gsa;    
+  cout << "n_threads" << N_THREADS << endl;
   cout << "READ_LENGTH: " << gsa->get_max_read_len() << endl;
   cout << "GSA1_MCT : " << GSA1_MCT  << endl;
   cout << "GSA2_MCT: " << GSA2_MCT << endl;
@@ -63,7 +64,9 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
   cout << "No of extracted reads: " << CancerExtraction.size() << endl;
   // Group blocks covering same mutations in both orientations
   cout << "Seeding breakpoint blocks by constructing GSA2..." << endl;
+  START(seedBreakPointBlocks);
   seedBreakPointBlocks();
+  COMP(seedBreakPointBlocks);
   CancerExtraction.clear();
   cout << "Number of seed blocks: " << SeedBlocks.size() << endl;
   cout << "<<<<<<<<<<<<<<building consensus pairs " << endl;
@@ -556,37 +559,69 @@ void SNVIdentifier::seedBreakPointBlocks() {
   divsufsort64((uint8_t*)const_cast<char*>(concat.c_str()), dSA,(int64_t)concat.size());
   cout << "Size of cancer specific sa: " << concat.size() << endl;
 
-  omp_set_num_threads(1);
+  omp_set_num_threads(N_THREADS);
   int64_t elementsPerThread = concat.size() / N_THREADS;
-  vector< vector<read_tag> > threadWorkArray(N_THREADS, vector<read_tag>());
-#pragma omp parallel for 
-  for (int i=0; i < N_THREADS; i++) {
-    int64_t from = i*elementsPerThread;
-    int64_t to;
+#pragma omp parallel for
+  for (int i = 0; i < N_THREADS; i++) {
+    int64_t * from = (dSA + i*elementsPerThread);
+    int64_t * to = nullptr;
     if (i == N_THREADS - 1) {
-      to = concat.size();
-    } else {
-      to = (i+1)*elementsPerThread;
+      to = (dSA + concat.size());
     }
-    transformBlock((dSA + from), (dSA + to), &bsa, concat, &threadWorkArray[i]);
+    else {
+      to = (dSA + (i+1)*elementsPerThread);
+    }
+    vector<shared_ptr<bpBlock> > twork;
+    buildVariantBlocks(from, to, bsa, concat, twork);
+#pragma omp critical 
+    SeedBlocks.insert(SeedBlocks.end(), twork.start(), twork.end());
   }
-  delete [] dSA;
-  vector<read_tag> aux_gsa;
-  int64_t gsaSz = 0;
-  for (vector<read_tag> const & tw : threadWorkArray) gsaSz += tw.size();
-  aux_gsa.reserve(gsaSz);
-  for (vector<read_tag> & tw : threadWorkArray) {
-    aux_gsa.insert(aux_gsa.end(), tw.begin(), tw.end());
-    tw.clear();
-  }
-  aux_gsa.shrink_to_fit();
-  cout << "GSA2 size: " << aux_gsa.size()<< endl;
-  extractBlocks(aux_gsa);
-
   std::stable_sort(SeedBlocks.begin(), SeedBlocks.end(), bpBlockCompare());
   auto last = std::unique(SeedBlocks.begin(), SeedBlocks.end(), bpBlockEqual());
   SeedBlocks.erase(last, SeedBlocks.end());
-////COMP(SNVIdentifier_seedBreakPointBlocks);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+//  vector< vector<read_tag> > threadWorkArray(N_THREADS, vector<read_tag>());
+//#pragma omp parallel for 
+//  for (int i=0; i < N_THREADS; i++) {
+//    int64_t from = i*elementsPerThread;
+//    int64_t to;
+//    if (i == N_THREADS - 1) {
+//      to = concat.size();
+//    } else {
+//      to = (i+1)*elementsPerThread;
+//    }
+//    transformBlock((dSA + from), (dSA + to), &bsa, concat, &threadWorkArray[i]);
+//  }
+//  delete [] dSA;
+//  vector<read_tag> aux_gsa;
+//  int64_t gsaSz = 0;
+//  for (vector<read_tag> const & tw : threadWorkArray) gsaSz += tw.size();
+//  aux_gsa.reserve(gsaSz);
+//  for (vector<read_tag> & tw : threadWorkArray) {
+//    aux_gsa.insert(aux_gsa.end(), tw.begin(), tw.end());
+//    tw.clear();
+//  }
+//  aux_gsa.shrink_to_fit();
+//  cout << "GSA2 size: " << aux_gsa.size()<< endl;
+//  extractBlocks(aux_gsa);
+//
+//  std::stable_sort(SeedBlocks.begin(), SeedBlocks.end(), bpBlockCompare());
+//  auto last = std::unique(SeedBlocks.begin(), SeedBlocks.end(), bpBlockEqual());
+//  SeedBlocks.erase(last, SeedBlocks.end());
+//////COMP(SNVIdentifier_seedBreakPointBlocks);
 }
 
 void SNVIdentifier::transformBlock(int64_t* from, 
