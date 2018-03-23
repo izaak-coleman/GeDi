@@ -25,6 +25,9 @@ struct read_tag{
   mutable int16_t offset;
   mutable bool orientation;
   unsigned char tissue_type;
+  read_tag (){};
+  read_tag(int64_t r, int16_t o, bool ori, char t):read_id(r), offset(o),
+  orientation(ori), tissue_type(t){};
 };
 
 struct read_tag_compare{
@@ -296,6 +299,24 @@ private:
 
   int64_t computeLCP(std::string::const_iterator a, std::string::const_iterator
       b);
+
+  void buildVariantBlocks(int64_t const * dSA, int64_t const dSA_sz, int64_t * seed_idx, int64_t const
+      * const to, std::vector< std::pair<int64_t, int64_t> > const & bsa, 
+      std::string const & concat, std::vector<std::shared_ptr<bpBlock>  > &
+      twork);
+
+  read_tag constructReadTag(int64_t const * dSA, int64_t const dSA_sz, 
+      std::vector<std::pair<int64_t, int64_t> > const & bsa, 
+      std::string const & concat, int64_t const * ptr);
+
+  void xorSwap(int64_t *x, int64_t *y);
+  int64_t bubbleRemove(int64_t * const a, int64_t const sz, int64_t const
+      invalid);
+  int64_t suffixLen(int64_t const i, std::string const & concat);
+  void remove_short_suffixes(int64_t* &sa, int64_t &sa_sz, int64_t
+    min_suffix_length, std::string const & concat);
+
+
   
   std::string readTagToString(read_tag const& tag);
   std::pair<int64_t, int64_t> binarySearch(std::vector< std::pair<int64_t,

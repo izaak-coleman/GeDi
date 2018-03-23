@@ -86,7 +86,7 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
 
   string consensus_pairs;
 #pragma omp parallel for 
-  for (int i = 0; i < n_threads; i++) {
+  for (int i = 0; i < 1; i++) {
     shared_ptr<bpBlock> * from = (&SeedBlocks[0] + i*elementsPerThread);
     shared_ptr<bpBlock> * to;
     if (i == n_threads - 1) {
@@ -120,7 +120,6 @@ void SNVIdentifier::writeConsensusPairs(string const & consensus_pairs, string c
       cout << "WRITE ERROR" << endl;
     }
   }
-  cout << ((src + src_sz) - it)*sizeof(*src) << endl;
   gzwrite(outfile, it, ((src + src_sz) - it));
   gzclose(outfile);
 }
@@ -555,30 +554,154 @@ void SNVIdentifier::seedBreakPointBlocks() {
   }
 
   cout << "Building cancer specific sa" << endl;
-  int64_t * dSA = new int64_t[concat.size()];
-  divsufsort64((uint8_t*)const_cast<char*>(concat.c_str()), dSA,(int64_t)concat.size());
-  cout << "Size of cancer specific sa: " << concat.size() << endl;
+  int64_t dSA_sz = concat.size();
+  int64_t * dSA = new int64_t[dSA_sz];
+  divsufsort64((uint8_t*)const_cast<char*>(concat.c_str()), dSA,(int64_t)dSA_sz);
+  cout << "Size of dSA before removes_short_suffixes: " << dSA_sz << endl;
 
-  omp_set_num_threads(N_THREADS);
-  int64_t elementsPerThread = concat.size() / N_THREADS;
+  // void function changes both dSA and dSA_sz
+  remove_short_suffixes(dSA, dSA_sz, gsa->get_min_suf_size(), concat);
+  cout << "Size of dSA after removes_short_suffixes: " << dSA_sz << endl;
+
+  omp_set_num_threads(1);
+  int64_t elementsPerThread = dSA_sz / N_THREADS;
 #pragma omp parallel for
-  for (int i = 0; i < N_THREADS; i++) {
+  for (int i = 0; i < 1; i++) {
     int64_t * from = (dSA + i*elementsPerThread);
     int64_t * to = nullptr;
-    if (i == N_THREADS - 1) {
-      to = (dSA + concat.size());
+    if (i == 1 - 1) {
+      to = (dSA + dSA_sz);
     }
     else {
       to = (dSA + (i+1)*elementsPerThread);
     }
     vector<shared_ptr<bpBlock> > twork;
-    buildVariantBlocks(from, to, bsa, concat, twork);
+    buildVariantBlocks(dSA, dSA_sz, from, to, bsa, concat, twork);
 #pragma omp critical 
-    SeedBlocks.insert(SeedBlocks.end(), twork.start(), twork.end());
+    SeedBlocks.insert(SeedBlocks.end(), twork.begin(), twork.end());
   }
   std::stable_sort(SeedBlocks.begin(), SeedBlocks.end(), bpBlockCompare());
   auto last = std::unique(SeedBlocks.begin(), SeedBlocks.end(), bpBlockEqual());
   SeedBlocks.erase(last, SeedBlocks.end());
+}
+
+void SNVIdentifier::buildVariantBlocks(int64_t const * dSA, int64_t const
+    dSA_sz,int64_t * seed_idx, int64_t const *
+    const to, vector< pair<int64_t, int64_t> > const & bsa, string const &
+    concat, vector< shared_ptr<bpBlock> > & twork) {
+
+  // push seed_idx back to start of group
+  if (seed_idx > dSA) {
+    while (computeLCP(concat.cbegin() + *seed_idx, concat.cbegin() +
+          *(seed_idx-1)) >= gsa->get_min_suf_size()) {
+      --seed_idx;
+      if (seed_idx == dSA) break;
+    }
+  }
+  int64_t * ext = seed_idx + 1;
+  while (seed_idx < to && seed_idx != (dSA + dSA_sz - 1)) {
+    while(computeLCP(concat.cbegin() + *seed_idx, concat.cbegin() + *ext) >=
+        gsa->get_min_suf_size()) {
+      ++ext;
+
+      if (ext == (dSA + dSA_sz)) break;
+    }
+    if (ext - seed_idx >= GSA2_MCT) {
+      // Then load into a variant block
+      shared_ptr<bpBlock> block(new bpBlock);
+      for (int64_t * it = seed_idx; it < ext; ++it) {
+        read_tag rt = constructReadTag(dSA, dSA_sz, bsa, concat, it);
+        block->insert(rt);
+      }
+      twork.push_back(block);
+    }
+    seed_idx = ext++;
+  }
+  if (seed_idx == (dSA + dSA_sz - 1) && GSA2_MCT == 1) {
+    shared_ptr<bpBlock> block;
+    block.reset(new bpBlock);
+    block->insert(constructReadTag(dSA, dSA_sz, bsa, concat, (dSA + dSA_sz -1)));
+    twork.push_back(block);
+  }
+}
+
+read_tag SNVIdentifier::constructReadTag(int64_t const * dSA, int64_t const dSA_sz,
+    vector<pair<int64_t, int64_t> > const & bsa, string const &
+    concat, int64_t const *ptr) {
+  auto orientation = [dSA, dSA_sz, &concat] (int64_t const *sa_pos) {
+    if (sa_pos < dSA || sa_pos > (dSA+dSA_sz)) exit(1);
+    string::const_iterator it = concat.cbegin() + *sa_pos;
+    for (; it < concat.cend(); ++it) {
+      if (*it == TERM) return RIGHT;
+      else if (*it == '#') return LEFT;
+    }
+  };
+  pair<int64_t, int64_t> readConcat = binarySearch(bsa, *ptr);
+  int offset = *ptr - readConcat.second;
+  int readSize = gsa->len(readConcat.first);
+  bool ori = orientation(ptr);
+  if (ori == LEFT) {
+    offset -= readSize;
+    offset = readSize - offset - gsa->get_min_suf_size() - 1;
+  }
+  read_tag r(readConcat.first, offset, ori, TUMOUR);
+  return r;
+}
+
+
+void SNVIdentifier::xorSwap(int64_t *x, int64_t *y) {
+  if (x != y) {
+    *x ^= *y;
+    *y ^= *x;
+    *x ^= *y;
+  }
+}
+
+int64_t SNVIdentifier::bubbleRemove(int64_t * const a, int64_t const sz, int64_t const invalid) {
+  int64_t *it = a; ++it;
+  int64_t *base = a;
+  while (it < (a + sz)) {
+    if (*base == invalid) {
+      while (it < (a + sz) && *it == invalid) ++it;
+      if (it >= (a + sz)) break;
+      xorSwap(base, it);
+    }
+    ++base; ++it;
+  }
+  return base - a;
+}
+
+int64_t SNVIdentifier::suffixLen(int64_t const i, string const & concat) {
+  if (i < 0 || i >= concat.size()) return -1;
+  int64_t len = 1;
+  for (string::const_iterator it = concat.cbegin() + i; it < concat.cend() &&
+      *it != TERM  && *it != '#'; ++it) ++len;
+  return len;
+}
+
+void SNVIdentifier::remove_short_suffixes(int64_t* &sa, int64_t &sa_sz, int64_t
+    min_suffix_length, string const & concat) {
+  omp_set_num_threads(N_THREADS);
+  int64_t elementsPerThread = sa_sz / N_THREADS;
+#pragma omp parallel for
+  for (int i = 0; i < N_THREADS; i++) {
+    int64_t* from = (sa + i*elementsPerThread);
+    int64_t* to = nullptr;
+    if (i == N_THREADS - 1) {
+      to = (sa + sa_sz);
+    }
+    else {
+      to = (sa + (i+1)*elementsPerThread);
+    }
+    while (from < to) {
+      if (suffixLen(*from, concat) <= min_suffix_length) {
+        *from = -1;
+      }
+      from++;
+    }
+  }
+  sa_sz = bubbleRemove(sa, sa_sz, -1);
+  sa = (int64_t*) std::realloc(sa, sa_sz*sizeof(int64_t));
 }
 
 
@@ -622,7 +745,7 @@ void SNVIdentifier::seedBreakPointBlocks() {
 //  auto last = std::unique(SeedBlocks.begin(), SeedBlocks.end(), bpBlockEqual());
 //  SeedBlocks.erase(last, SeedBlocks.end());
 //////COMP(SNVIdentifier_seedBreakPointBlocks);
-}
+//}
 
 void SNVIdentifier::transformBlock(int64_t* from, 
      int64_t* to, vector< pair<int64_t, int64_t> > *bsa, string const& concat,
