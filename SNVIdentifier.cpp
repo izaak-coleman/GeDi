@@ -86,7 +86,7 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
 
   string consensus_pairs;
 #pragma omp parallel for 
-  for (int i = 0; i < 1; i++) {
+  for (int i = 0; i < N_THREADS; i++) {
     shared_ptr<bpBlock> * from = (&SeedBlocks[0] + i*elementsPerThread);
     shared_ptr<bpBlock> * to;
     if (i == n_threads - 1) {
@@ -563,13 +563,13 @@ void SNVIdentifier::seedBreakPointBlocks() {
   remove_short_suffixes(dSA, dSA_sz, gsa->get_min_suf_size(), concat);
   cout << "Size of dSA after removes_short_suffixes: " << dSA_sz << endl;
 
-  omp_set_num_threads(1);
+  omp_set_num_threads(N_THREADS);
   int64_t elementsPerThread = dSA_sz / N_THREADS;
 #pragma omp parallel for
-  for (int i = 0; i < 1; i++) {
+  for (int i = 0; i < N_THREADS; i++) {
     int64_t * from = (dSA + i*elementsPerThread);
     int64_t * to = nullptr;
-    if (i == 1 - 1) {
+    if (i == N_THREADS  - 1) {
       to = (dSA + dSA_sz);
     }
     else {
