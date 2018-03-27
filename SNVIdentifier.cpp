@@ -704,83 +704,6 @@ void SNVIdentifier::remove_short_suffixes(int64_t* &sa, int64_t &sa_sz, int64_t
   sa = (int64_t*) std::realloc(sa, sa_sz*sizeof(int64_t));
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-//  vector< vector<read_tag> > threadWorkArray(N_THREADS, vector<read_tag>());
-//#pragma omp parallel for 
-//  for (int i=0; i < N_THREADS; i++) {
-//    int64_t from = i*elementsPerThread;
-//    int64_t to;
-//    if (i == N_THREADS - 1) {
-//      to = concat.size();
-//    } else {
-//      to = (i+1)*elementsPerThread;
-//    }
-//    transformBlock((dSA + from), (dSA + to), &bsa, concat, &threadWorkArray[i]);
-//  }
-//  delete [] dSA;
-//  vector<read_tag> aux_gsa;
-//  int64_t gsaSz = 0;
-//  for (vector<read_tag> const & tw : threadWorkArray) gsaSz += tw.size();
-//  aux_gsa.reserve(gsaSz);
-//  for (vector<read_tag> & tw : threadWorkArray) {
-//    aux_gsa.insert(aux_gsa.end(), tw.begin(), tw.end());
-//    tw.clear();
-//  }
-//  aux_gsa.shrink_to_fit();
-//  cout << "GSA2 size: " << aux_gsa.size()<< endl;
-//  extractBlocks(aux_gsa);
-//
-//  std::stable_sort(SeedBlocks.begin(), SeedBlocks.end(), bpBlockCompare());
-//  auto last = std::unique(SeedBlocks.begin(), SeedBlocks.end(), bpBlockEqual());
-//  SeedBlocks.erase(last, SeedBlocks.end());
-//////COMP(SNVIdentifier_seedBreakPointBlocks);
-//}
-
-void SNVIdentifier::transformBlock(int64_t* from, 
-     int64_t* to, vector< pair<int64_t, int64_t> > *bsa, string const& concat,
-     vector<read_tag> *block) {
-
-  auto orientation = [from, to, &concat] (int64_t *sa_pos) {
-    if (sa_pos < from || sa_pos > to) exit(1);
-    string::const_iterator it = concat.cbegin() + *sa_pos;
-    for (; it < concat.cend(); ++it) {
-      if (*it == TERM) return RIGHT;
-      else if (*it == '#') return LEFT;
-    }
-  };
-
-  for (; from < to; from++) {
-    pair<int64_t, int64_t> readConcat = binarySearch(*bsa,*from);
-    int offset = *from - readConcat.second;
-    int readSize = gsa->len(readConcat.first);
-    bool ori = orientation(from);
-    if (ori == LEFT) {
-      offset -= readSize;
-    }
-    if (readSize - offset <= gsa->get_min_suf_size()) continue;
-    if (ori == LEFT) {
-      offset = readSize - offset - gsa->get_min_suf_size() - 1;
-    }
-    read_tag t;
-    t.read_id = readConcat.first;
-    t.orientation = ori;
-    t.offset = offset;
-    t.tissue_type = TUMOUR;
-    block->push_back(t);
-  }
-}
-
 pair<int64_t, int64_t> SNVIdentifier::binarySearch(vector< pair<int64_t,
     int64_t> > const & bsa, int64_t sa_pos) {
   int64_t r = bsa.size();
@@ -1087,65 +1010,6 @@ int SNVIdentifier::lcp(string const& l, string const& r, unsigned int mlr) {
 //COMP(SNVIdentifier_lcp);
 }
 
-
-void SNVIdentifier::mergeBlocks(bpBlock & to, bpBlock & from) {
-//START(SNVIdentifier_mergeBlocks);
-  bpBlock::iterator f_it = from.begin();
-  bpBlock::iterator common_read;
-  // Find read in common between blocks.
-  for(; (common_read = to.find(*f_it)) == to.end(); f_it++);
-
-  // The orientation associated with each read, is its aligning orientation
-  // relative to its current block. At this moment in time, the final
-  // orientation (which we consider the orientation relative to the reference)
-  // is unknown. Therefore, if the common read is in opposite orientations
-  // in the from and to block, the orientations of each read in the
-  // from block needs to be switched.
-  if (common_read->orientation != f_it->orientation) {
-    for(bpBlock::iterator it = from.begin();
-        it != from.end(); it++) {
-      if (it->orientation == LEFT) {
-        it->orientation = RIGHT;
-      } else {
-        it->orientation = LEFT;
-      }
-    }
-  }
-
-  // correct for symetric blocks
-  // adjustment will only be correctly calculated if reads are both
-  // in the same orientation
-  int common_read_offset{common_read->offset}, f_it_offset{f_it->offset};
-  if (common_read->orientation == LEFT) {
-    //int read_size = reads->getReadByIndex(common_read->read_id, common_read->tissue_type).size();
-    //  common_read_offset = (read_size - (common_read->offset + reads->getMinSuffixSize() + 1));
-    common_read_offset = convertOffset(*common_read);
-  }
-  if (f_it->orientation == LEFT) {
-    //int read_size = reads->getReadByIndex(f_it->read_id, f_it->tissue_type).size();
-    //  f_it_offset = (read_size - (f_it->offset + reads->getMinSuffixSize() + 1));
-    f_it_offset = convertOffset(*f_it);
-  }
-
-  // Adjust offsets to to block.
-  // Orientation check performs the correct adjustment in either
-  // orientation.
-  int adjustment = common_read_offset - f_it_offset;
-  cout << adjustment << endl;
-
-  for (bpBlock::iterator it = from.begin();
-       it != from.end();
-       it++) {
-    if (it->orientation == RIGHT) {
-      it->offset += adjustment;
-    } else {
-      it->offset -= adjustment;
-    }
-    to.insert(*it);
-  }
-//COMP(SNVIdentifier_mergeBlocks);
-}
-
 int SNVIdentifier::convertOffset(read_tag const& tag) {
 //START(SNVIdentifier_convertOffset);
   int64_t  sz = gsa->len(tag.read_id);
@@ -1153,6 +1017,13 @@ int SNVIdentifier::convertOffset(read_tag const& tag) {
 //COMP(SNVIdentifier_convertOffset);
 }
 
+int64_t SNVIdentifier::getSize() {
+  return BreakPointBlocks.size();
+}
+
+
+// end of file
+/*
 void SNVIdentifier::unifyBlocks(vector<bpBlock> & seedBlocks) {
 //START(SNVIdentifier_unifyBlocks);
   std::sort(
@@ -1235,14 +1106,97 @@ void SNVIdentifier::unifyBlocks(vector<bpBlock> & seedBlocks) {
   }
 //COMP(SNVIdentifier_unifyBlocks);
 }
+void SNVIdentifier::mergeBlocks(bpBlock & to, bpBlock & from) {
+//START(SNVIdentifier_mergeBlocks);
+  bpBlock::iterator f_it = from.begin();
+  bpBlock::iterator common_read;
+  // Find read in common between blocks.
+  for(; (common_read = to.find(*f_it)) == to.end(); f_it++);
 
-int64_t SNVIdentifier::getSize() {
-  return BreakPointBlocks.size();
+  // The orientation associated with each read, is its aligning orientation
+  // relative to its current block. At this moment in time, the final
+  // orientation (which we consider the orientation relative to the reference)
+  // is unknown. Therefore, if the common read is in opposite orientations
+  // in the from and to block, the orientations of each read in the
+  // from block needs to be switched.
+  if (common_read->orientation != f_it->orientation) {
+    for(bpBlock::iterator it = from.begin();
+        it != from.end(); it++) {
+      if (it->orientation == LEFT) {
+        it->orientation = RIGHT;
+      } else {
+        it->orientation = LEFT;
+      }
+    }
+  }
+
+  // correct for symetric blocks
+  // adjustment will only be correctly calculated if reads are both
+  // in the same orientation
+  int common_read_offset{common_read->offset}, f_it_offset{f_it->offset};
+  if (common_read->orientation == LEFT) {
+    //int read_size = reads->getReadByIndex(common_read->read_id, common_read->tissue_type).size();
+    //  common_read_offset = (read_size - (common_read->offset + reads->getMinSuffixSize() + 1));
+    common_read_offset = convertOffset(*common_read);
+  }
+  if (f_it->orientation == LEFT) {
+    //int read_size = reads->getReadByIndex(f_it->read_id, f_it->tissue_type).size();
+    //  f_it_offset = (read_size - (f_it->offset + reads->getMinSuffixSize() + 1));
+    f_it_offset = convertOffset(*f_it);
+  }
+
+  // Adjust offsets to to block.
+  // Orientation check performs the correct adjustment in either
+  // orientation.
+  int adjustment = common_read_offset - f_it_offset;
+  cout << adjustment << endl;
+
+  for (bpBlock::iterator it = from.begin();
+       it != from.end();
+       it++) {
+    if (it->orientation == RIGHT) {
+      it->offset += adjustment;
+    } else {
+      it->offset -= adjustment;
+    }
+    to.insert(*it);
+  }
+//COMP(SNVIdentifier_mergeBlocks);
 }
+//void SNVIdentifier::transformBlock(int64_t* from, 
+//     int64_t* to, vector< pair<int64_t, int64_t> > *bsa, string const& concat,
+//     vector<read_tag> *block) {
+//
+//  auto orientation = [from, to, &concat] (int64_t *sa_pos) {
+//    if (sa_pos < from || sa_pos > to) exit(1);
+//    string::const_iterator it = concat.cbegin() + *sa_pos;
+//    for (; it < concat.cend(); ++it) {
+//      if (*it == TERM) return RIGHT;
+//      else if (*it == '#') return LEFT;
+//    }
+//  };
+//
+//  for (; from < to; from++) {
+//    pair<int64_t, int64_t> readConcat = binarySearch(*bsa,*from);
+//    int offset = *from - readConcat.second;
+//    int readSize = gsa->len(readConcat.first);
+//    bool ori = orientation(from);
+//    if (ori == LEFT) {
+//      offset -= readSize;
+//    }
+//    if (readSize - offset <= gsa->get_min_suf_size()) continue;
+//    if (ori == LEFT) {
+//      offset = readSize - offset - gsa->get_min_suf_size() - 1;
+//    }
+//    read_tag t;
+//    t.read_id = readConcat.first;
+//    t.orientation = ori;
+//    t.offset = offset;
+//    t.tissue_type = TUMOUR;
+//    block->push_back(t);
+//  }
+//}
 
-
-// end of file
-/*
 void BreakPointBlocks::outputExtractedCancerReads(std::string const& filename) {
   ofstream ofHandle(filename.c_str());
   for (unsigned int read_idx : CancerExtraction) {
