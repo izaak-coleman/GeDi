@@ -60,7 +60,9 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
   cout << "ALLELIC_FREQ_OF_ERROR: " << ALLELIC_FREQ_OF_ERROR << endl;
   cout << MIN_PHRED_QUAL << endl;
   cout << "Extracting cancer-specific reads..." << endl;
+  START(extractCancerSp);
   extractCancerSpecificReads(); 
+  COMP(extractCancerSp);
   cout << "No of extracted reads: " << CancerExtraction.size() << endl;
   // Group blocks covering same mutations in both orientations
   cout << "Seeding breakpoint blocks by constructing GSA2..." << endl;
@@ -446,7 +448,9 @@ void SNVIdentifier::extractCancerSpecificReads() {
     extractionWorker(from, to, threadWork);
 #pragma omp critical
     {
+      START(set_ins);
       CancerExtraction.insert(threadWork.begin(), threadWork.end());
+      COMP(set_ins);
       threadWork.clear();
     }
   }
