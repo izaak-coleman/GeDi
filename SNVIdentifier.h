@@ -51,6 +51,21 @@ struct read_tag_compare{
 
 using bpBlock = std::set<read_tag, read_tag_compare>;
 
+struct vBlockComp{
+  bool operator() (std::shared_ptr<bpBlock const> const a, std::shared_ptr<bpBlock const> const b) {
+    if (a->size() < b->size()) return true;
+    if (a->size() > b->size()) return false;
+    else {
+      for(bpBlock::const_iterator a_it = a->cbegin(), b_it = b->cbegin();
+          a_it != a->cend(); ++a_it, ++b_it) {
+        if (a_it->read_id == b_it->read_id) continue;
+        return a_it->read_id < b_it->read_id;
+      }
+    }
+    return false; // same reads in blocks
+  }
+};
+
 struct tumourRTCompare{
   bool operator() (const read_tag &a, const read_tag &b) {
     if (a.read_id != b.read_id) {
@@ -302,7 +317,7 @@ private:
 
   void buildVariantBlocks(int64_t const * dSA, int64_t const dSA_sz, int64_t * seed_idx, int64_t const
       * const to, std::vector< std::pair<int64_t, int64_t> > const & bsa, 
-      std::string const & concat, std::vector<std::shared_ptr<bpBlock>  > &
+      std::string const & concat, std::set<std::shared_ptr<bpBlock>, vBlockComp > &
       twork);
 
   read_tag constructReadTag(int64_t const * dSA, int64_t const dSA_sz, 

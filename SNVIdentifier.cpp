@@ -34,6 +34,15 @@ Author: Izaak Coleman
 using namespace std;
 
 const char TERM = '$';
+int64_t extNonMut = 0;
+int64_t genConSeq = 0;
+int64_t noSNVTime = 0;
+int64_t excessLowQualityTime = 0;
+int64_t trimHealthyConsensusTime = 0;
+int64_t trimCancerConsensusTime = 0;
+int64_t maskLowQualityPositionsTime = 0;
+
+
 
 SNVIdentifier::SNVIdentifier(GSA &_gsa,
                                      string outpath,
@@ -107,6 +116,13 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
   cout << "<<<<<<<<<<<<<<Finished break point block construction" << endl;
   cout << "Writing consensus pairs as fastq" << endl;
   writeConsensusPairs(consensus_pairs, outpath + basename + ".fastq.gz");
+  cout << "Time in enma:  " << extNonMut << endl;
+  cout << "Time in genconseq:  " << genConSeq << endl;
+  cout << "Time in noSNV:  " << noSNVTime << endl;
+  cout << "Time in excessLQ:  " << excessLowQualityTime << endl;
+  cout << "Time in trimCancerCNS:  " << trimCancerConsensusTime << endl;
+  cout << "Time in trimHealthyCNS:  " << trimHealthyConsensusTime << endl;
+  cout << "Time in trimHealthyCNS:  " << maskLowQualityPositionsTime << endl;
 //COMP(SNVIdentifier_SNVIdentifier);
 }
 
@@ -136,14 +152,29 @@ void SNVIdentifier::buildConsensusPairsWorker(shared_ptr<bpBlock> * block,
     }
     consensus_pair pair;
     pair.left_ohang = pair.right_ohang = 0;
+    auto gcst = std::chrono::steady_clock::now();
     generateConsensusSequence(TUMOUR, **block, pair.mut_offset, pair.mutated, pair.mqual);
+    auto gcst_end = std::chrono::steady_clock::now();
+    genConSeq += std::chrono::duration_cast<std::chrono::milliseconds>(gcst_end
+        - gcst).count();
 
+
+
+    auto enma = std::chrono::steady_clock::now();
     extractNonMutatedAlleles(**block, pair);
+    auto enma_end = std::chrono::steady_clock::now();
+    extNonMut += std::chrono::duration_cast<std::chrono::milliseconds>(enma_end
+        - enma).count();
+
     if ((*block)->size() > COVERAGE_UPPER_THRESHOLD) {
       *block = nullptr;
       continue;
     }
+    auto gcsh = std::chrono::steady_clock::now();
     generateConsensusSequence(HEALTHY, **block, pair.nmut_offset, pair.non_mutated, pair.nqual);
+    auto gcsh_end = std::chrono::steady_clock::now();
+    genConSeq += std::chrono::duration_cast<std::chrono::milliseconds>(gcsh_end
+        - gcsh).count();
     *block = nullptr;
     if (pair.mutated.empty() || pair.non_mutated.empty()) {
       continue;
@@ -169,6 +200,7 @@ void SNVIdentifier::buildConsensusPairsWorker(shared_ptr<bpBlock> * block,
 }
 
 bool SNVIdentifier::noSNV(consensus_pair const & pair) {
+    auto start = std::chrono::steady_clock::now();
   if (pair.mutated[0] != pair.non_mutated [0 + pair.left_ohang] &&
       pair.mutated[1] == pair.non_mutated[1 + pair.left_ohang]) {
     return false;
@@ -187,19 +219,28 @@ bool SNVIdentifier::noSNV(consensus_pair const & pair) {
       return false;
     }
   }
+    auto end = std::chrono::steady_clock::now();
+    noSNVTime += std::chrono::duration_cast<std::chrono::nanoseconds>(end -
+        start).count();
   return true;
 }
 
 
 bool SNVIdentifier::excessLowQuality(consensus_pair & pair) {
 //START(SNVIdentifier_excessLowQuality);
+    auto start = std::chrono::steady_clock::now();
   int numLowQuality{0};
   for (int i = 0; i < pair.mutated.size(); i++) {
+//    numLowQuality += (pair.mqual[i] == 'L');
     if (pair.mqual[i] == 'L') numLowQuality++;
   }
   for (int i = 0; i < pair.non_mutated.size(); i++) {
+//    numLowQuality += (pair.nqual[i] == 'L' || pair.nqual[i] == 'B');
     if (pair.nqual[i] == 'L' || pair.nqual[i] == 'B') numLowQuality++;
   }
+  auto end = std::chrono::steady_clock::now();
+    excessLowQualityTime += std::chrono::duration_cast<std::chrono::nanoseconds>(end -
+        start).count();
   if (numLowQuality > MAX_LOW_CONFIDENCE_POS) return true;
   return false;
 //COMP(SNVIdentifier_excessLowQuality);
@@ -207,16 +248,22 @@ bool SNVIdentifier::excessLowQuality(consensus_pair & pair) {
 
 void SNVIdentifier::maskLowQualityPositions(consensus_pair & pair) {
 //START(SNVIdentifier_maskLowQualityPositions);
+    auto start = std::chrono::steady_clock::now();
   for (int pos=0; pos < pair.mutated.size(); pos++) {
     if (pair.mqual[pos] != '-' || pair.nqual[pos + pair.left_ohang] != '-') {
       pair.mutated[pos] = pair.non_mutated[pos + pair.left_ohang];
     }
   }
+  auto end = std::chrono::steady_clock::now();
+    maskLowQualityPositionsTime +=
+      std::chrono::duration_cast<std::chrono::nanoseconds>(end -
+        start).count();
 //COMP(SNVIdentifier_maskLowQualityPositions);
 }
 
 void SNVIdentifier::trimCancerConsensus(consensus_pair & pair) {
 //START(SNVIdentifier_trimCancerConsensus);
+    auto start = std::chrono::steady_clock::now();
   if (pair.mut_offset > pair.nmut_offset) {
     pair.mutated.erase(0, pair.mut_offset - pair.nmut_offset);
     pair.mqual.erase(0, pair.mut_offset - pair.nmut_offset);
@@ -232,11 +279,16 @@ void SNVIdentifier::trimCancerConsensus(consensus_pair & pair) {
   else if (pair.mutated.size() < (pair.non_mutated.size() - pair.left_ohang)) {
     pair.right_ohang = (pair.non_mutated.size() - pair.left_ohang) - pair.mutated.size();
   }
+  auto end = std::chrono::steady_clock::now();
+    trimCancerConsensusTime +=
+      std::chrono::duration_cast<std::chrono::nanoseconds>(end -
+        start).count();
 //COMP(SNVIdentifier_trimCancerConsensus);
 }
 
 void SNVIdentifier::trimHealthyConsensus(consensus_pair & pair) {
 //START(SNVIdentifier_trimHealthyConsensus);
+    auto start = std::chrono::steady_clock::now();
   int left_arrow = 0, right_arrow = pair.nqual.size() - 1;
   for(; right_arrow >= 0 && 
         (pair.nqual[right_arrow] == 'T' ||
@@ -251,6 +303,10 @@ void SNVIdentifier::trimHealthyConsensus(consensus_pair & pair) {
   pair.nqual.erase(0, left_arrow);
   pair.non_mutated.erase(0, left_arrow);
   pair.nmut_offset -= left_arrow;
+  auto end = std::chrono::steady_clock::now();
+    trimHealthyConsensusTime +=
+      std::chrono::duration_cast<std::chrono::nanoseconds>(end -
+        start).count();
 //COMP(SNVIdentifier_trimHealthyConsensus);
 }
 
@@ -339,18 +395,24 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
     string::iterator phredPtr = phred.begin();
     for(int i=0; i < read.size(); i++) {
       // only allow high quality bases to contribute to consensus
-      if (*(phredPtr + i) >= MIN_PHRED_QUAL) {
-        switch (*(readPtr + i)) {
-          case 'A':
-            cnsCount[(max_offset - tag.offset + i)*4    ]++; break; //= 1 & (*(phredPtr + i) >= MIN_PHRED_QUAL); break;
-          case 'T':                               
-            cnsCount[(max_offset - tag.offset + i)*4 + 1]++; break; //= 1 & (*(phredPtr + i) >= MIN_PHRED_QUAL); break;
-          case 'C':                               
-            cnsCount[(max_offset - tag.offset + i)*4 + 2]++; break; //= 1 & (*(phredPtr + i) >= MIN_PHRED_QUAL); break;
-          case 'G':                               
-            cnsCount[(max_offset - tag.offset + i)*4 + 3]++; break; //= 1 & (*(phredPtr + i) >= MIN_PHRED_QUAL); break;
-        }
-      }
+      cnsCount[
+        ((max_offset - tag.offset + i)*4    ) * (*(readPtr + i) == 'A') +  
+        ((max_offset - tag.offset + i)*4 + 1) * (*(readPtr + i) == 'T') +
+        ((max_offset - tag.offset + i)*4 + 2) * (*(readPtr + i) == 'C') +
+        ((max_offset - tag.offset + i)*4 + 3) * (*(readPtr + i) == 'G') 
+      ] += 1 * (*(phredPtr + i) >= MIN_PHRED_QUAL);
+      //if ( (*(phredPtr + i) >= MIN_PHRED_QUAL) ) {
+      //  switch (*(readPtr + i)) {
+      //    case 'A':
+      //      cnsCount[(max_offset - tag.offset + i)*4    ]++; break; //= 1 & (*(phredPtr + i) >= MIN_PHRED_QUAL); break;
+      //    case 'T':                               
+      //      cnsCount[(max_offset - tag.offset + i)*4 + 1]++; break; //= 1 & (*(phredPtr + i) >= MIN_PHRED_QUAL); break;
+      //    case 'C':                               
+      //      cnsCount[(max_offset - tag.offset + i)*4 + 2]++; break; //= 1 & (*(phredPtr + i) >= MIN_PHRED_QUAL); break;
+      //    case 'G':                               
+      //      cnsCount[(max_offset - tag.offset + i)*4 + 3]++; break; //= 1 & (*(phredPtr + i) >= MIN_PHRED_QUAL); break;
+      //  }
+      //}
     }
   }
 
@@ -448,9 +510,7 @@ void SNVIdentifier::extractCancerSpecificReads() {
     extractionWorker(from, to, threadWork);
 #pragma omp critical
     {
-      START(set_ins);
       CancerExtraction.insert(threadWork.begin(), threadWork.end());
-      COMP(set_ins);
       threadWork.clear();
     }
   }
@@ -569,7 +629,8 @@ void SNVIdentifier::seedBreakPointBlocks() {
 
   omp_set_num_threads(N_THREADS);
   int64_t elementsPerThread = dSA_sz / N_THREADS;
-#pragma omp parallel for
+  set<shared_ptr<bpBlock>, vBlockComp> result;
+#pragma omp parallel for ordered
   for (int i = 0; i < N_THREADS; i++) {
     int64_t * from = (dSA + i*elementsPerThread);
     int64_t * to = nullptr;
@@ -579,20 +640,26 @@ void SNVIdentifier::seedBreakPointBlocks() {
     else {
       to = (dSA + (i+1)*elementsPerThread);
     }
-    vector<shared_ptr<bpBlock> > twork;
+    set<shared_ptr<bpBlock> , vBlockComp> twork;
     buildVariantBlocks(dSA, dSA_sz, from, to, bsa, concat, twork);
-#pragma omp critical 
-    SeedBlocks.insert(SeedBlocks.end(), twork.begin(), twork.end());
+#pragma omp ordered
+  //  SeedBlocks.insert(SeedBlocks.end(), twork.begin(), twork.end());
+    result.insert(twork.begin(), twork.end());
   }
-  std::stable_sort(SeedBlocks.begin(), SeedBlocks.end(), bpBlockCompare());
-  auto last = std::unique(SeedBlocks.begin(), SeedBlocks.end(), bpBlockEqual());
-  SeedBlocks.erase(last, SeedBlocks.end());
+  //std::stable_sort(SeedBlocks.begin(), SeedBlocks.end(), bpBlockCompare());
+  //auto last = std::unique(SeedBlocks.begin(), SeedBlocks.end(), bpBlockEqual());
+  //SeedBlocks.erase(last, SeedBlocks.end());
+  //set<shared_ptr<bpBlock>, vBlockComp > filter;
+  //START(filter);
+  //filter.insert(result.begin(), result.end());
+  //COMP(filter);
+  SeedBlocks.insert(SeedBlocks.end(), result.begin(), result.end());
 }
 
 void SNVIdentifier::buildVariantBlocks(int64_t const * dSA, int64_t const
     dSA_sz,int64_t * seed_idx, int64_t const *
     const to, vector< pair<int64_t, int64_t> > const & bsa, string const &
-    concat, vector< shared_ptr<bpBlock> > & twork) {
+    concat, set< shared_ptr<bpBlock> , vBlockComp> & twork) {
 
   // push seed_idx back to start of group
   if (seed_idx > dSA) {
@@ -617,7 +684,7 @@ void SNVIdentifier::buildVariantBlocks(int64_t const * dSA, int64_t const
         read_tag rt = constructReadTag(dSA, dSA_sz, bsa, concat, it);
         block->insert(rt);
       }
-      twork.push_back(block);
+      twork.insert(block);
     }
     seed_idx = ext++;
   }
@@ -625,7 +692,7 @@ void SNVIdentifier::buildVariantBlocks(int64_t const * dSA, int64_t const
     shared_ptr<bpBlock> block;
     block.reset(new bpBlock);
     block->insert(constructReadTag(dSA, dSA_sz, bsa, concat, (dSA + dSA_sz -1)));
-    twork.push_back(block);
+    twork.insert(block);
   }
 }
 
