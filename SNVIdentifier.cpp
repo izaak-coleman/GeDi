@@ -41,6 +41,7 @@ int64_t excessLowQualityTime = 0;
 int64_t trimHealthyConsensusTime = 0;
 int64_t trimCancerConsensusTime = 0;
 int64_t maskLowQualityPositionsTime = 0;
+int64_t gcs_timers = 0;
 
 
 
@@ -123,6 +124,8 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
   cout << "Time in trimCancerCNS:  " << trimCancerConsensusTime << endl;
   cout << "Time in trimHealthyCNS:  " << trimHealthyConsensusTime << endl;
   cout << "Time in trimHealthyCNS:  " << maskLowQualityPositionsTime << endl;
+  cout << "Time in gsc_timer: " << gcs_timers << endl;
+
 //COMP(SNVIdentifier_SNVIdentifier);
 }
 
@@ -231,12 +234,12 @@ bool SNVIdentifier::excessLowQuality(consensus_pair & pair) {
     auto start = std::chrono::steady_clock::now();
   int numLowQuality{0};
   for (int i = 0; i < pair.mutated.size(); i++) {
-//    numLowQuality += (pair.mqual[i] == 'L');
-    if (pair.mqual[i] == 'L') numLowQuality++;
+    numLowQuality += (pair.mqual[i] == 'L');
+//    if (pair.mqual[i] == 'L') numLowQuality++;
   }
   for (int i = 0; i < pair.non_mutated.size(); i++) {
-//    numLowQuality += (pair.nqual[i] == 'L' || pair.nqual[i] == 'B');
-    if (pair.nqual[i] == 'L' || pair.nqual[i] == 'B') numLowQuality++;
+    numLowQuality += (pair.nqual[i] == 'L' || pair.nqual[i] == 'B');
+//    if (pair.nqual[i] == 'L' || pair.nqual[i] == 'B') numLowQuality++;
   }
   auto end = std::chrono::steady_clock::now();
     excessLowQualityTime += std::chrono::duration_cast<std::chrono::nanoseconds>(end -
@@ -250,6 +253,11 @@ void SNVIdentifier::maskLowQualityPositions(consensus_pair & pair) {
 //START(SNVIdentifier_maskLowQualityPositions);
     auto start = std::chrono::steady_clock::now();
   for (int pos=0; pos < pair.mutated.size(); pos++) {
+  //  pair.mutated[pos] = (pair.mutated[pos] & setter*!(pair.mqual[pos] != '-' ||
+  //      pair.nqual[pos + pair.left_ohang] != '-')) | (pair.non_mutated[pos +
+  //    pair.left_ohang] & setter*(pair.mqual[pos] != '-' || pair.nqual[pos +
+  //        pair.left_ohang] != '-'));
+
     if (pair.mqual[pos] != '-' || pair.nqual[pos + pair.left_ohang] != '-') {
       pair.mutated[pos] = pair.non_mutated[pos + pair.left_ohang];
     }
@@ -416,16 +424,19 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
     }
   }
 
-  //COMP(computecnsCount);
-  //START(computeCNS);
   for (int pos=0; pos < width; pos++) {
-    int maxVal = 0, maxInd = 0;
-    for(int base=0; base < 4; base++) {
-      if (cnsCount[pos*4 + base] > maxVal) {
-        maxVal = cnsCount[pos*4 + base];
-        maxInd = base;
-      }
+    int maxVal = 0, maxInd = 0, m = -1;
+    for (int base=0; base < 4; ++base) {
+      bool cond = (cnsCount[pos*4 + base] > maxVal);
+      maxVal = (cnsCount[pos*4 + base] & m*cond) | (maxVal & m*!cond);
+      maxInd = (base & m*cond) | (maxInd & m*!cond);
     }
+    //for(int base=0; base < 4; base++) {
+    //  if (cnsCount[pos*4 + base] > maxVal) {
+    //    maxVal = cnsCount[pos*4 + base];
+    //    maxInd = base;
+    //  }
+    //}
     switch(maxInd) {
       case 0: cns += "A"; break;
       case 1: cns += "T"; break;
@@ -433,8 +444,6 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
       case 3: cns += "G"; break;
     }
   }
-  //COMP(computeCNS);
-  //START(buildQualStr);
   cns_offset = max_offset;
   string q_str(width, '-');
   for (int pos=0; pos < width; pos++) {
@@ -452,7 +461,7 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
   }
   buildQualityString(q_str, cnsCount, cns, tissue);
   qual = std::move(q_str);
-  //COMP(buildQualStr);
+ // COMP(buildQualStr);
 //COMP(SNVIdentifier_generateConsensusSequence);
 }
 
