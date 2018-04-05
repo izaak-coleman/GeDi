@@ -356,7 +356,6 @@ void SNVIdentifier::extractNonMutatedAlleles(bpBlock &block,
 //COMP(SNVIdentifier_extractNonMutatedAlleles);
 }
 char SNVIdentifier::rc(char c, int dir) {
-  //char m = -1;
   if (dir == 1) {
     return c;
   }
@@ -367,11 +366,6 @@ char SNVIdentifier::rc(char c, int dir) {
     case 'C': return 'G';
   }
   return 'x';
-  //return (c & m*(dir == 1)) | (m*!(dir == 1) 
-  //    & 'A' & m*(c == 'T')
-  //    & 'T' & m*(c == 'A')
-  //    & 'G' & m*(c == 'C')
-  //    & 'C' & m*(c == 'G'));
 }
 
 void SNVIdentifier::generateConsensusSequence(bool tissue,
