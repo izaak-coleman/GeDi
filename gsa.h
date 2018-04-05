@@ -55,6 +55,7 @@ public:
 
   bool tissuetype(int64_t const i); // returns TUMOUR/HEALTHY
   std::string::const_iterator suffix_at(int64_t i);
+  std::string::const_iterator phred_at (int64_t i);
   std::string::const_iterator read_of_suffix(int64_t const i);
   int64_t offset(int64_t const i);
   int64_t len(int64_t const i);

@@ -247,6 +247,11 @@ string::const_iterator GSA::suffix_at(int64_t i) {
   return concat.cbegin() + i;
 }
 
+string::const_iterator GSA::phred_at(int64_t i) {
+  if (i < 0 || i >= phred.size()) return phred.cend();
+  return phred.cbegin() + i;
+}
+
 string::const_iterator GSA::read_of_suffix(int64_t const i) {
   if (i < 0 || i >= concat.size()) return concat.cend();
   return concat.cbegin() + (i - offset(i));

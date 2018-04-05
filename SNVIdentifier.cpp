@@ -355,6 +355,24 @@ void SNVIdentifier::extractNonMutatedAlleles(bpBlock &block,
   }
 //COMP(SNVIdentifier_extractNonMutatedAlleles);
 }
+char SNVIdentifier::rc(char c, int dir) {
+  //char m = -1;
+  if (dir == 1) {
+    return c;
+  }
+  switch (c) {
+    case 'A': return 'T';
+    case 'T': return 'A';
+    case 'G': return 'C';
+    case 'C': return 'G';
+  }
+  return 'x';
+  //return (c & m*(dir == 1)) | (m*!(dir == 1) 
+  //    & 'A' & m*(c == 'T')
+  //    & 'T' & m*(c == 'A')
+  //    & 'G' & m*(c == 'C')
+  //    & 'C' & m*(c == 'G'));
+}
 
 void SNVIdentifier::generateConsensusSequence(bool tissue,
     bpBlock const& block, int & cns_offset, string & cns,
@@ -392,24 +410,55 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
   unsigned int width = max_offset + gsa->get_max_read_len() - min_offset;
   vector<int> cnsCount(4*width, 0);
   for (read_tag const & tag : subBlock) {
-    string read = gsa->get_suffix_string(tag.read_id);
-    string phred = gsa->get_phred_string(tag.read_id);
+    string::const_iterator readPtr = gsa->suffix_at(tag.read_id);
+    string::const_iterator readPtr_end = gsa->suffix_at(tag.read_id) + gsa->len(tag.read_id) - 2;
+    string::const_iterator phredPtr = gsa->phred_at(tag.read_id);
+    string::const_iterator phredPtr_end = gsa->phred_at(tag.read_id) + gsa->len(tag.read_id) - 2;
+    int d= 1;
+    if (tag.orientation == LEFT) {
+      // swap pointers
+      string::const_iterator rtemp, ptemp;
+      rtemp = readPtr; readPtr = readPtr_end; readPtr_end = rtemp;
+      ptemp = phredPtr; phredPtr = phredPtr_end; phredPtr_end = ptemp;
+      d= -1;
+    }
+
+    //string read = gsa->get_suffix_string(tag.read_id);
+    //string phred = gsa->get_phred_string(tag.read_id);
     //cout << read << endl;
     //cout << phred << endl;
-    if (tag.orientation == LEFT) {
-      read = reverseComplementString(read);
-      std::reverse(phred.begin(), phred.end());
-    }
-    string::iterator readPtr = read.begin();
-    string::iterator phredPtr = phred.begin();
-    for(int i=0; i < read.size(); i++) {
-      // only allow high quality bases to contribute to consensus
+    //if (tag.orientation == LEFT) {
+    //  read = reverseComplementString(read);
+    //  read += '$';
+    //  std::reverse(phred.begin(), phred.end());
+    //}
+    //phred += '\0';
+    //string::iterator readPtr = read.begin();
+    //string::iterator phredPtr = phred.begin();
+    int i = 0;
+    for (; (readPtr + i*d) != readPtr_end; i++) {
       cnsCount[
-        ((max_offset - tag.offset + i)*4    ) * (*(readPtr + i) == 'A') +  
-        ((max_offset - tag.offset + i)*4 + 1) * (*(readPtr + i) == 'T') +
-        ((max_offset - tag.offset + i)*4 + 2) * (*(readPtr + i) == 'C') +
-        ((max_offset - tag.offset + i)*4 + 3) * (*(readPtr + i) == 'G') 
-      ] += 1 * (*(phredPtr + i) >= MIN_PHRED_QUAL);
+        ((max_offset - tag.offset + i)*4    ) * (rc(*(readPtr + i*d),d) == 'A') +  
+        ((max_offset - tag.offset + i)*4 + 1) * (rc(*(readPtr + i*d),d) == 'T') +
+        ((max_offset - tag.offset + i)*4 + 2) * (rc(*(readPtr + i*d),d) == 'C') +
+        ((max_offset - tag.offset + i)*4 + 3) * (rc(*(readPtr + i*d),d) == 'G') 
+      ] += 1 * (*(phredPtr + i*d) >= MIN_PHRED_QUAL);
+    }
+    cnsCount[
+      ((max_offset - tag.offset + i)*4    ) * (rc(*(readPtr + i*d),d) == 'A') +  
+      ((max_offset - tag.offset + i)*4 + 1) * (rc(*(readPtr + i*d),d) == 'T') +
+      ((max_offset - tag.offset + i)*4 + 2) * (rc(*(readPtr + i*d),d) == 'C') +
+      ((max_offset - tag.offset + i)*4 + 3) * (rc(*(readPtr + i*d),d) == 'G') 
+    ] += 1 * (*(phredPtr + i*d) >= MIN_PHRED_QUAL);
+  }
+    //for(int i=0; i < read.size()-1; i++) {
+    //  // only allow high quality bases to contribute to consensus
+    //  cnsCount[
+    //    ((max_offset - tag.offset + i)*4    ) * (*(readPtr + i) == 'A') +  
+    //    ((max_offset - tag.offset + i)*4 + 1) * (*(readPtr + i) == 'T') +
+    //    ((max_offset - tag.offset + i)*4 + 2) * (*(readPtr + i) == 'C') +
+    //    ((max_offset - tag.offset + i)*4 + 3) * (*(readPtr + i) == 'G') 
+    //  ] += 1 * (*(phredPtr + i) >= MIN_PHRED_QUAL);
       //if ( (*(phredPtr + i) >= MIN_PHRED_QUAL) ) {
       //  switch (*(readPtr + i)) {
       //    case 'A':
@@ -422,8 +471,6 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
       //      cnsCount[(max_offset - tag.offset + i)*4 + 3]++; break; //= 1 & (*(phredPtr + i) >= MIN_PHRED_QUAL); break;
       //  }
       //}
-    }
-  }
 
   for (int pos=0; pos < width; pos++) {
     int maxVal = 0, maxInd = 0, m = -1;
@@ -1041,10 +1088,11 @@ int64_t SNVIdentifier::binarySearch(string const &query) {
 
   // find minimum prefix length of left and right bounds with query
   lcp_left_query = lcp(gsa->suffix_at(gsa->sa_element(left)), 
-                       gsa->suffix_at(gsa->sa_element(left) + gsa->len(left)),
+                       gsa->suffix_at(gsa->sa_element(left) + gsa->len(left)-1),
                        query.cbegin(), query.cend(), 0);
   lcp_right_query = lcp(gsa->suffix_at(gsa->sa_element(right)), 
-                        gsa->suffix_at(gsa->sa_element(right) + gsa->len(right)),
+                        gsa->suffix_at(gsa->sa_element(right) +
+                          gsa->len(right)-1),
                         query.cbegin(), query.cend(), 0);
   min_left_right = minVal(lcp_left_query, lcp_right_query);
   while (left <= right) {
@@ -1052,7 +1100,8 @@ int64_t SNVIdentifier::binarySearch(string const &query) {
     bool left_shift{false};
     mid = (left + right) / 2;
     string::const_iterator mid_begin = gsa->suffix_at(gsa->sa_element(mid));
-    string::const_iterator mid_end = gsa->suffix_at(gsa->sa_element(mid) + gsa->len(mid));
+    string::const_iterator mid_end = gsa->suffix_at(gsa->sa_element(mid) +
+        gsa->len(mid)-1);
 
     if(lcp(mid_begin, mid_end, query.cbegin(), query.cend(),  min_left_right) == query.size()) {
       // 30bp stretch covered. Arrived at genomic location. Return.
@@ -1075,14 +1124,16 @@ int64_t SNVIdentifier::binarySearch(string const &query) {
     if (left_shift) {
       if (left >= 0 && left < gsa->size()) {
         lcp_left_query  = lcp(gsa->suffix_at(gsa->sa_element(left)), 
-                              gsa->suffix_at(gsa->sa_element(left) + gsa->len(left)),
+                              gsa->suffix_at(gsa->sa_element(left) +
+                                gsa->len(left)-1),
                               query.cbegin(), query.cend(), min_left_right);
       }
     }
     else {  // must be right_shift
       if (right >= 0 && right < gsa->size()) {
         lcp_right_query = lcp(gsa->suffix_at(gsa->sa_element(right)),
-                              gsa->suffix_at(gsa->sa_element(right) + gsa->len(right)),
+                              gsa->suffix_at(gsa->sa_element(right) +
+                                gsa->len(right)-1),
                               query.cbegin(), query.cend(), min_left_right);
       }
     }

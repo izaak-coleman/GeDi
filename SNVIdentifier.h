@@ -297,6 +297,8 @@ private:
   // converts alignment offset between forward and reverse orientation,
   // returning the converted offset
 
+  char rc(char c, int d);
+
   void trimHealthyConsensus(consensus_pair & pair);
   // Trims distal regions of the healthy consensus sequence
   // up to the last consensus character that has a corresponding
