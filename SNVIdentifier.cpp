@@ -21,6 +21,7 @@ Author: Izaak Coleman
 #include <functional>
 #include <algorithm>
 #include <memory>
+#include <iterator>
 
 #include <zlib.h>
 #include <omp.h>
@@ -160,7 +161,6 @@ void SNVIdentifier::buildConsensusPairsWorker(shared_ptr<bpBlock> * block,
     auto gcst_end = std::chrono::steady_clock::now();
     genConSeq += std::chrono::duration_cast<std::chrono::milliseconds>(gcst_end
         - gcst).count();
-
 
 
     auto enma = std::chrono::steady_clock::now();
@@ -388,6 +388,7 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
   }
 
   //START(computecnsCount);
+
   unsigned int width = max_offset + gsa->get_max_read_len() - min_offset;
   vector<int> cnsCount(4*width, 0);
   for (read_tag const & tag : subBlock) {
@@ -1005,25 +1006,24 @@ int SNVIdentifier::minVal(int a, int b) {
   return (a > b) ? b : a;
 }
 
-bool SNVIdentifier::lexCompare(string const& l, string const& r, unsigned int min_lr) {
+bool SNVIdentifier::lexCompare(string::const_iterator l, 
+    string::const_iterator l_end,
+    string::const_iterator r, 
+    string::const_iterator r_end, unsigned int min_lr) {
 //START(SNVIdentifier_lexCompare);
   // return true if l < r
   // min_lr avoids redundant searches 
-
-  string::const_iterator l_iter  = l.begin() + min_lr;    
-  string::const_iterator l_end   = l.end();
-  string::const_iterator r_iter  = r.begin() + min_lr;
-  string::const_iterator r_end   = r.end();
-
-  for( ; (l_iter != l_end && r_iter != r_end); l_iter++, r_iter++){
+  l += min_lr;
+  r += min_lr;
+  for( ; (l != l_end && r != r_end); ++l, ++r){
     // lex compare character
-    if (*l_iter < *r_iter) return true;
-    if (*r_iter < *l_iter) return false;
+    if (*l < *r) return true;
+    if (*r < *l) return false;
     // equiv char so move to next...
   }
 
   // One is prefix of other, return the prefix as higher suffix
-  return (l_iter == l_end) && (r_iter != r_end);
+  return (l == l_end) && (r != r_end);
 //COMP(SNVIdentifier_lexCompare);
 }
 
@@ -1040,18 +1040,25 @@ int64_t SNVIdentifier::binarySearch(string const &query) {
   unsigned int lcp_right_query;
 
   // find minimum prefix length of left and right bounds with query
-  lcp_left_query = lcp(gsa->get_suffix_string(gsa->sa_element(left)), query, 0);
-  lcp_right_query = lcp(gsa->get_suffix_string(gsa->sa_element(right)), query, 0);
+  lcp_left_query = lcp(gsa->suffix_at(gsa->sa_element(left)), 
+                       gsa->suffix_at(gsa->sa_element(left) + gsa->len(left)),
+                       query.cbegin(), query.cend(), 0);
+  lcp_right_query = lcp(gsa->suffix_at(gsa->sa_element(right)), 
+                        gsa->suffix_at(gsa->sa_element(right) + gsa->len(right)),
+                        query.cbegin(), query.cend(), 0);
   min_left_right = minVal(lcp_left_query, lcp_right_query);
   while (left <= right) {
 
     bool left_shift{false};
     mid = (left + right) / 2;
-    if(lcp(gsa->get_suffix_string(gsa->sa_element(mid)), query,  min_left_right) == query.size()) {
+    string::const_iterator mid_begin = gsa->suffix_at(gsa->sa_element(mid));
+    string::const_iterator mid_end = gsa->suffix_at(gsa->sa_element(mid) + gsa->len(mid));
+
+    if(lcp(mid_begin, mid_end, query.cbegin(), query.cend(),  min_left_right) == query.size()) {
       // 30bp stretch covered. Arrived at genomic location. Return.
       return mid; 
     }
-    if(lexCompare(gsa->get_suffix_string(gsa->sa_element(mid)), query, min_left_right)) {
+    if(lexCompare(mid_begin, mid_end, query.cbegin(), query.cend(), min_left_right)) {
       // then query lexicographically lower (indexed > mid) (higher ranked
       // characters) so move left bound towards right
       left = mid+1;
@@ -1067,12 +1074,16 @@ int64_t SNVIdentifier::binarySearch(string const &query) {
     // only recompute the moved bound
     if (left_shift) {
       if (left >= 0 && left < gsa->size()) {
-        lcp_left_query  = lcp(gsa->get_suffix_string(gsa->sa_element(left)), query, min_left_right);
-     }
+        lcp_left_query  = lcp(gsa->suffix_at(gsa->sa_element(left)), 
+                              gsa->suffix_at(gsa->sa_element(left) + gsa->len(left)),
+                              query.cbegin(), query.cend(), min_left_right);
+      }
     }
     else {  // must be right_shift
       if (right >= 0 && right < gsa->size()) {
-        lcp_right_query = lcp(gsa->get_suffix_string(gsa->sa_element(right)), query, min_left_right);
+        lcp_right_query = lcp(gsa->suffix_at(gsa->sa_element(right)),
+                              gsa->suffix_at(gsa->sa_element(right) + gsa->len(right)),
+                              query.cbegin(), query.cend(), min_left_right);
       }
     }
     min_left_right = minVal(lcp_left_query, lcp_right_query);
@@ -1081,10 +1092,13 @@ int64_t SNVIdentifier::binarySearch(string const &query) {
 //COMP(SNVIdentifier_binarySearch);
 }
 
-int SNVIdentifier::lcp(string const& l, string const& r, unsigned int mlr) {
+int SNVIdentifier::lcp(string::const_iterator l, 
+                       string::const_iterator l_end,
+                       string::const_iterator r, 
+                       string::const_iterator r_end, unsigned int mlr) {
 //START(SNVIdentifier_lcp);
-  while (mlr < l.length() && mlr < r.length() && l[mlr] == r[mlr]) {
-    mlr++;
+  while (mlr < std::distance(l, l_end) && mlr < std::distance(r, r_end) && *(l + mlr) == *(r + mlr)) {
+    ++mlr;
   }
   return mlr;
 //COMP(SNVIdentifier_lcp);
@@ -1103,6 +1117,7 @@ int64_t SNVIdentifier::getSize() {
 
 
 // end of file
+
 /*
 void SNVIdentifier::unifyBlocks(vector<bpBlock> & seedBlocks) {
 //START(SNVIdentifier_unifyBlocks);

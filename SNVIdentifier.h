@@ -249,12 +249,20 @@ private:
   //  -- failed search: -1 
   //  -- success: index of matching suffix
 
-  int lcp(std::string const& l, std::string const& r, unsigned int mlr);
+  int lcp(std::string::const_iterator l, 
+          std::string::const_iterator l_end,
+          std::string::const_iterator r,
+          std::string::const_iterator r_end,
+          unsigned int mlr);
   // optimized lcp computer. Optimization: Starts search lcp count and comparison
   // mlr and l[mlr],r[mlr] respectively. As characters at index < mlr in
   // suffixes of the GSA will be identical
 
-  bool lexCompare(std::string const& l, std::string const& r, unsigned int min_lr);
+  bool lexCompare(std::string::const_iterator l,
+                  std::string::const_iterator l_end,
+                  std::string::const_iterator r,
+                  std::string::const_iterator r_end,
+                  unsigned int min_lr);
   // Performs an optimized comparison, with same optimization as lcp()
 
   int minVal(int a, int b);
