@@ -36,16 +36,17 @@ struct read_tag_compare{
     // Within the set read_tags are:
     // -- First sorted by tissue type TUMOUR = SWITCHED < HEALTHY
     // -- Then sorted by read_id
-    if( (a.tissue_type == TUMOUR || a.tissue_type == SWITCHED) &&
-        (b.tissue_type == TUMOUR || b.tissue_type == SWITCHED) ) {
-        return a.read_id < b.read_id;
-    }
-    else if (a.tissue_type == HEALTHY && b.tissue_type == HEALTHY) {
-        return a.read_id < b.read_id;
-    }
-    else {
-        return (a.tissue_type % 2) < (b.tissue_type % 2); // mod to keep SWITCHED and TUMOUR together
-    }
+    return a.read_id < b.read_id;
+    //if( (a.tissue_type == TUMOUR || a.tissue_type == SWITCHED) &&
+    //    (b.tissue_type == TUMOUR || b.tissue_type == SWITCHED) ) {
+    //    return a.read_id < b.read_id;
+    //}
+    //else if (a.tissue_type == HEALTHY && b.tissue_type == HEALTHY) {
+    //    return a.read_id < b.read_id;
+    //}
+    //else {
+    //    return (a.tissue_type % 2) < (b.tissue_type % 2); // mod to keep SWITCHED and TUMOUR together
+    //}
   }
 };
 
@@ -182,7 +183,7 @@ private:
   // Divides coloured GSA into even chunks and deploys threads
   // with each thread computing extractGroupsWorker() over an allocated chunk.
 
-  void extractionWorker(int64_t to, int64_t from, std::set<unsigned int> & threadExtr);
+  void extractionWorker(int64_t to, int64_t from, std::set<int64_t> & threadExtr);
   // Passes through allocated GSA chunk and extracts reads as cancer specific 
   // reads if:
   // -- Suffixes of cancer specific reads form a block that covers the

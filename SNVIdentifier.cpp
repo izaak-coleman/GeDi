@@ -43,6 +43,7 @@ int64_t trimHealthyConsensusTime = 0;
 int64_t trimCancerConsensusTime = 0;
 int64_t maskLowQualityPositionsTime = 0;
 int64_t gcs_timers = 0;
+int64_t rbInsert = 0;
 
 
 
@@ -126,6 +127,7 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
   cout << "Time in trimHealthyCNS:  " << trimHealthyConsensusTime << endl;
   cout << "Time in trimHealthyCNS:  " << maskLowQualityPositionsTime << endl;
   cout << "Time in gsc_timer: " << gcs_timers << endl;
+  cout << "Time in rbInsert: " << rbInsert << endl;
 
 //COMP(SNVIdentifier_SNVIdentifier);
 }
@@ -557,7 +559,7 @@ void SNVIdentifier::extractCancerSpecificReads() {
     } else {
       to = (i+1)*elementsPerThread;
     }
-    set<unsigned int> threadWork;
+    set<int64_t> threadWork;
     extractionWorker(from, to, threadWork);
 #pragma omp critical
     {
@@ -597,7 +599,7 @@ int64_t SNVIdentifier::computeLCP(string::const_iterator a, string::const_iterat
   return lcp;
 }
 
-void SNVIdentifier::extractionWorker(int64_t seed_index, int64_t to, set<unsigned int> & threadExtr) {
+void SNVIdentifier::extractionWorker(int64_t seed_index, int64_t to, set<int64_t> & threadExtr) {
 //START(SNVIdentifier_extractionWorker);
   seed_index = backUpSearchStart(seed_index);
   int64_t extension {seed_index + 1};
@@ -665,7 +667,7 @@ void SNVIdentifier::seedBreakPointBlocks() {
     concat += reverseComplementString(gsa->get_suffix_string(*it));
     concat += '#';
     concat_idx += gsa->len(*std::prev(it)) * 2;
-    bsa.push_back(pair<unsigned int, int64_t>(*it, concat_idx));
+    bsa.push_back(pair<int64_t, int64_t>(*it, concat_idx));
   }
 
   cout << "Building cancer specific sa" << endl;
@@ -697,14 +699,9 @@ void SNVIdentifier::seedBreakPointBlocks() {
   //  SeedBlocks.insert(SeedBlocks.end(), twork.begin(), twork.end());
     result.insert(twork.begin(), twork.end());
   }
-  //std::stable_sort(SeedBlocks.begin(), SeedBlocks.end(), bpBlockCompare());
-  //auto last = std::unique(SeedBlocks.begin(), SeedBlocks.end(), bpBlockEqual());
-  //SeedBlocks.erase(last, SeedBlocks.end());
-  //set<shared_ptr<bpBlock>, vBlockComp > filter;
-  //START(filter);
-  //filter.insert(result.begin(), result.end());
-  //COMP(filter);
+  START(seed_b_ins);
   SeedBlocks.insert(SeedBlocks.end(), result.begin(), result.end());
+  COMP(seed_b_ins);
 }
 
 void SNVIdentifier::buildVariantBlocks(int64_t const * dSA, int64_t const
