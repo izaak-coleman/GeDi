@@ -100,7 +100,7 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
 
   string consensus_pairs;
 #pragma omp parallel for 
-  for (int i = 0; i < N_THREADS; i++) {
+  for (int i = 0; i < n_threads; i++) {
     shared_ptr<bpBlock> * from = (&SeedBlocks[0] + i*elementsPerThread);
     shared_ptr<bpBlock> * to;
     if (i == n_threads - 1) {
@@ -374,7 +374,7 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
     bpBlock const& block, int & cns_offset, string & cns,
     string & qual) {
 //START(SNVIdentifier_generateConsensusSequence);
-  std::vector<read_tag> subBlock;            // work with subset
+  vector<read_tag> subBlock;            // work with subset
   for (read_tag const& tag : block) {
     if (tissue == HEALTHY  && 
        (tag.tissue_type == HEALTHY || tag.tissue_type == SWITCHED)) {
@@ -406,6 +406,7 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
   unsigned int width = max_offset + gsa->get_max_read_len() - min_offset;
   vector<int> cnsCount(4*width, 0);
   for (read_tag const & tag : subBlock) {
+
     string::const_iterator readPtr = gsa->suffix_at(tag.read_id);
     string::const_iterator readPtr_end = gsa->suffix_at(tag.read_id) + gsa->len(tag.read_id) - 2;
     string::const_iterator phredPtr = gsa->phred_at(tag.read_id);
@@ -475,6 +476,9 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
       maxVal = (cnsCount[pos*4 + base] & m*cond) | (maxVal & m*!cond);
       maxInd = (base & m*cond) | (maxInd & m*!cond);
     }
+    if (maxVal == 0) {
+      maxInd = assignBaseDisregardingPhred(pos, subBlock, max_offset);
+    }
     //for(int base=0; base < 4; base++) {
     //  if (cnsCount[pos*4 + base] > maxVal) {
     //    maxVal = cnsCount[pos*4 + base];
@@ -507,6 +511,29 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
   qual = std::move(q_str);
  // COMP(buildQualStr);
 //COMP(SNVIdentifier_generateConsensusSequence);
+}
+
+int SNVIdentifier::assignBaseDisregardingPhred(int const pos, vector<read_tag> const &
+    block, int const max_offset) {
+  char c[4];
+  string a = "ATCG";
+  for (read_tag const & r : block) {
+    int idx = r.offset - max_offset + pos;
+    if (r.orientation == LEFT) {
+      idx = gsa->len(r.read_id) - idx - 2;
+    }
+    if (idx < 0 || idx > gsa->len(r.read_id)-1) continue;
+    string::const_iterator p = gsa->suffix_at(r.read_id) +  idx;
+    ++c[a.find(rc(*p, (r.orientation == RIGHT)))];
+  }
+  int maxVal = 0, maxInd = 0;
+  for (int i = 0; i < 4; ++i) {
+    if (c[i] > maxVal) {
+      maxVal = c[i];
+      maxInd = i;
+    }
+  }
+  return maxInd;
 }
 
 void SNVIdentifier::buildQualityString(string & qual, vector<int> const& freq_matrix,

@@ -334,6 +334,8 @@ private:
   void remove_short_suffixes(int64_t* &sa, int64_t &sa_sz, int64_t
     min_suffix_length, std::string const & concat);
 
+  int assignBaseDisregardingPhred(int const pos, std::vector<read_tag> const & block,
+      int const max_offset);
 
   
   std::string readTagToString(read_tag const& tag);
