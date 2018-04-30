@@ -209,7 +209,14 @@ void GSA::remove_short_suffixes(int64_t min_suffix_length) {
     }
   }
   sa_sz = bubbleRemove(sa, sa_sz, -1);
-  sa = (int64_t*) std::realloc(sa, sa_sz*sizeof(int64_t));
+  int64_t* temp = (int64_t*) std::realloc(sa, sa_sz*sizeof(int64_t));
+  if (temp == nullptr) {
+    cout << "Not enough memory to construct suffix array. Program terminating."
+      << endl;
+    exit(1);
+  } else {
+    sa = temp;
+  }
 }
 
 void GSA::constructConcat(string const& fname) {

@@ -357,6 +357,10 @@ public:
                     double econt, double allelic_freq_of_error);
 
   int64_t getSize();
+  std::string addGaps(int ngaps);
+  // adds gaps preceeding a read to give aligned output.
+
+  void printAlignedBlock(bpBlock block);
 
 };
 
@@ -365,10 +369,6 @@ public:
 
 #endif
 /*
-  std::string addGaps(int ngaps);
-  // adds gaps preceeding a read to give aligned output.
-
-  void printAlignedBlock(bpBlock block);
   bool generateConsensusSequence(unsigned int block_id, int &cns_offset, 
       bool tissue_type, unsigned int &pair_id,
       std::string &cns, std::string & qual);

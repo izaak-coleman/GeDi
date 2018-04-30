@@ -204,6 +204,68 @@ void SNVIdentifier::buildConsensusPairsWorker(shared_ptr<bpBlock> * block,
   }
 }
 
+void SNVIdentifier::printAlignedBlock(bpBlock block) {
+  if (block.size() > COVERAGE_UPPER_THRESHOLD || block.empty()) return;
+  int max = std::numeric_limits<int>::min();
+
+  for (read_tag tag : block) {
+    if (tag.orientation == LEFT) {
+      tag.offset = convertOffset(tag);
+    }
+    if (tag.offset > max) {
+      max = tag.offset;
+    }
+  }
+
+  cout << "TUMOUR subblock " << endl;
+  for (read_tag tag : block) {
+    if (tag.tissue_type == HEALTHY || tag.tissue_type == SWITCHED) continue;
+    string read;
+    int offset = tag.offset;
+    if (tag.orientation == LEFT) {
+      read = reverseComplementString(gsa->get_suffix_string(tag.read_id));
+      offset = convertOffset(tag);
+    } 
+    else {
+      read = gsa->get_suffix_string(tag.read_id);
+      read.pop_back();
+    }
+
+    cout << addGaps(max - offset) << read << " - " 
+         << tag.read_id << " - " 
+         << tag.offset << " - " 
+         << ((tag.orientation) ? "R" : "L") << " - "
+         << ((tag.tissue_type == HEALTHY) ? "H" : ((tag.tissue_type == SWITCHED) ? "S" : "T")) << endl;
+  }
+
+  cout << "HEALTHY subblock " << endl;
+  for (read_tag tag : block) {
+    if (tag.tissue_type == TUMOUR) continue;
+    string read;
+    int offset = tag.offset;
+    if (tag.orientation == LEFT) {
+      read = reverseComplementString(gsa->get_suffix_string(tag.read_id));
+      offset = convertOffset(tag);
+    } 
+    else {
+      read = gsa->get_suffix_string(tag.read_id);
+      read.pop_back();
+    }
+
+    cout << addGaps(max - offset) << read << " - " 
+         << tag.read_id << " - " 
+         << tag.offset << " - " 
+         << ((tag.orientation) ? "R" : "L") << " - "
+         << ((tag.tissue_type == HEALTHY) ? "H" : ((tag.tissue_type == SWITCHED) ? "S" : "T")) << endl;
+  }
+}
+string SNVIdentifier::addGaps(int n_gaps) {
+//START(SNVIdentifier_addGaps);
+  string gaps(n_gaps, '-');
+  return gaps;
+//COMP(SNVIdentifier_addGaps);
+}
+
 bool SNVIdentifier::noSNV(consensus_pair const & pair) {
     auto start = std::chrono::steady_clock::now();
   if (pair.mutated[0] != pair.non_mutated [0 + pair.left_ohang] &&
@@ -434,12 +496,24 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
     //string::iterator phredPtr = phred.begin();
     int i = 0;
     for (; (readPtr + i*d) != readPtr_end; i++) {
-      cnsCount[
-        ((max_offset - tag.offset + i)*4    ) * (rc(*(readPtr + i*d),d) == 'A') +  
-        ((max_offset - tag.offset + i)*4 + 1) * (rc(*(readPtr + i*d),d) == 'T') +
-        ((max_offset - tag.offset + i)*4 + 2) * (rc(*(readPtr + i*d),d) == 'C') +
-        ((max_offset - tag.offset + i)*4 + 3) * (rc(*(readPtr + i*d),d) == 'G') 
-      ] += 1 * (*(phredPtr + i*d) >= MIN_PHRED_QUAL);
+      //if ( (*(phredPtr + i) >= MIN_PHRED_QUAL) ) {
+      //  switch (*(readPtr + i)) {
+      //    case 'A':
+      //      cnsCount[(max_offset - tag.offset + i)*4    ]++; break; //= 1 & (*(phredPtr + i) >= MIN_PHRED_QUAL); break;
+      //    case 'T':                               
+      //      cnsCount[(max_offset - tag.offset + i)*4 + 1]++; break; //= 1 & (*(phredPtr + i) >= MIN_PHRED_QUAL); break;
+      //    case 'C':                               
+      //      cnsCount[(max_offset - tag.offset + i)*4 + 2]++; break; //= 1 & (*(phredPtr + i) >= MIN_PHRED_QUAL); break;
+      //    case 'G':                               
+      //      cnsCount[(max_offset - tag.offset + i)*4 + 3]++; break; //= 1 & (*(phredPtr + i) >= MIN_PHRED_QUAL); break;
+      //  }
+      //}
+        cnsCount[
+          ((max_offset - tag.offset + i)*4    ) * (rc(*(readPtr + i*d),d) == 'A') +  
+          ((max_offset - tag.offset + i)*4 + 1) * (rc(*(readPtr + i*d),d) == 'T') +
+          ((max_offset - tag.offset + i)*4 + 2) * (rc(*(readPtr + i*d),d) == 'C') +
+          ((max_offset - tag.offset + i)*4 + 3) * (rc(*(readPtr + i*d),d) == 'G') 
+        ] += 1 * (*(phredPtr + i*d) >= MIN_PHRED_QUAL);
     }
     cnsCount[
       ((max_offset - tag.offset + i)*4    ) * (rc(*(readPtr + i*d),d) == 'A') +  
@@ -456,18 +530,6 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
     //    ((max_offset - tag.offset + i)*4 + 2) * (*(readPtr + i) == 'C') +
     //    ((max_offset - tag.offset + i)*4 + 3) * (*(readPtr + i) == 'G') 
     //  ] += 1 * (*(phredPtr + i) >= MIN_PHRED_QUAL);
-      //if ( (*(phredPtr + i) >= MIN_PHRED_QUAL) ) {
-      //  switch (*(readPtr + i)) {
-      //    case 'A':
-      //      cnsCount[(max_offset - tag.offset + i)*4    ]++; break; //= 1 & (*(phredPtr + i) >= MIN_PHRED_QUAL); break;
-      //    case 'T':                               
-      //      cnsCount[(max_offset - tag.offset + i)*4 + 1]++; break; //= 1 & (*(phredPtr + i) >= MIN_PHRED_QUAL); break;
-      //    case 'C':                               
-      //      cnsCount[(max_offset - tag.offset + i)*4 + 2]++; break; //= 1 & (*(phredPtr + i) >= MIN_PHRED_QUAL); break;
-      //    case 'G':                               
-      //      cnsCount[(max_offset - tag.offset + i)*4 + 3]++; break; //= 1 & (*(phredPtr + i) >= MIN_PHRED_QUAL); break;
-      //  }
-      //}
 
   for (int pos=0; pos < width; pos++) {
     int maxVal = 0, maxInd = 0, m = -1;
@@ -495,7 +557,8 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
   cns_offset = max_offset;
   string q_str(width, '-');
   for (int pos=0; pos < width; pos++) {
-    // mask all positions with reads less than >= GSA2_MCT
+    // Mask position if there is < GSA_MCT2 reads supporting the chosen
+    // consensus character
     int nreads=0;
     for (int base=0; base < 4; base++) nreads += cnsCount[pos*4 + base];
     if (nreads < GSA2_MCT) {
@@ -515,7 +578,7 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
 
 int SNVIdentifier::assignBaseDisregardingPhred(int const pos, vector<read_tag> const &
     block, int const max_offset) {
-  char c[4];
+  int c[4] = {};
   string a = "ATCG";
   for (read_tag const & r : block) {
     int idx = r.offset - max_offset + pos;
@@ -699,7 +762,7 @@ void SNVIdentifier::seedBreakPointBlocks() {
 
   cout << "Building cancer specific sa" << endl;
   int64_t dSA_sz = concat.size();
-  int64_t * dSA = new int64_t[dSA_sz];
+  int64_t * dSA = (int64_t*) std::malloc(dSA_sz*sizeof(int64_t));
   divsufsort64((uint8_t*)const_cast<char*>(concat.c_str()), dSA,(int64_t)dSA_sz);
   cout << "Size of dSA before removes_short_suffixes: " << dSA_sz << endl;
 
@@ -729,6 +792,7 @@ void SNVIdentifier::seedBreakPointBlocks() {
   START(seed_b_ins);
   SeedBlocks.insert(SeedBlocks.end(), result.begin(), result.end());
   COMP(seed_b_ins);
+  std::free(dSA);
 }
 
 void SNVIdentifier::buildVariantBlocks(int64_t const * dSA, int64_t const
@@ -3333,67 +3397,6 @@ void BreakPointBlocks::makeBreakPointBlocks(){
     if(it == mutation_grouper.end()) {break;}
   }
 
-void SNVIdentifier::printAlignedBlock(bpBlock block) {
-  if (block.size() > COVERAGE_UPPER_THRESHOLD || block.empty()) return;
-  int max = std::numeric_limits<int>::min();
-
-  for (read_tag tag : block) {
-    if (tag.orientation == LEFT) {
-      tag.offset = convertOffset(tag);
-    }
-    if (tag.offset > max) {
-      max = tag.offset;
-    }
-  }
-
-  cout << "TUMOUR subblock " << endl;
-  for (read_tag tag : block) {
-    if (tag.tissue_type == HEALTHY || tag.tissue_type == SWITCHED) continue;
-    string read;
-    int offset = tag.offset;
-    if (tag.orientation == LEFT) {
-      read = reverseComplementString(reads->getReadByIndex(tag.read_id, tag.tissue_type));
-      offset = convertOffset(tag);
-    } 
-    else {
-      read = reads->getReadByIndex(tag.read_id, tag.tissue_type);
-      read.pop_back();
-    }
-
-    cout << addGaps(max - offset) << read << " - " 
-         << tag.read_id << " - " 
-         << tag.offset << " - " 
-         << ((tag.orientation) ? "R" : "L") << " - "
-         << ((tag.tissue_type == HEALTHY) ? "H" : ((tag.tissue_type == SWITCHED) ? "S" : "T")) << endl;
-  }
-
-  cout << "HEALTHY subblock " << endl;
-  for (read_tag tag : block) {
-    if (tag.tissue_type == TUMOUR) continue;
-    string read;
-    int offset = tag.offset;
-    if (tag.orientation == LEFT) {
-      read = reverseComplementString(reads->getReadByIndex(tag.read_id, tag.tissue_type));
-      offset = convertOffset(tag);
-    } 
-    else {
-      read = reads->getReadByIndex(tag.read_id, tag.tissue_type);
-      read.pop_back();
-    }
-
-    cout << addGaps(max - offset) << read << " - " 
-         << tag.read_id << " - " 
-         << tag.offset << " - " 
-         << ((tag.orientation) ? "R" : "L") << " - "
-         << ((tag.tissue_type == HEALTHY) ? "H" : ((tag.tissue_type == SWITCHED) ? "S" : "T")) << endl;
-  }
-}
-string SNVIdentifier::addGaps(int n_gaps) {
-//START(SNVIdentifier_addGaps);
-  string gaps(n_gaps, '-');
-  return gaps;
-//COMP(SNVIdentifier_addGaps);
-}
 
 }
 */
