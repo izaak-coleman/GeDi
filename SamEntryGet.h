@@ -29,7 +29,7 @@ int get<int>(int k, SamEntry const * s) {
 template <>
 std::string get<std::string>(int k, SamEntry const * s) {
   switch (k) {
-    case 0:  return s->hdr;
+    case 0:  return s->t_cns;
     case 2:  return s->rname;
     case 5:  return s->cigar;
     case 6:  return s->rnext;

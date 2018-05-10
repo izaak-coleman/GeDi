@@ -16,6 +16,7 @@ Author: Izaak Coleman
 #include <utility>
 #include <iterator>
 #include <map>
+#include <list>
 #include <limits>
 #include <cstdlib> // exit
 #include <functional>
@@ -98,7 +99,7 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
     elementsPerThread = SeedBlocks.size() / n_threads;
   }
 
-  string consensus_pairs;
+  std::list<consensus_pair> consensus_pairs;
 #pragma omp parallel for 
   for (int i = 0; i < n_threads; i++) {
     shared_ptr<bpBlock> * from = (&SeedBlocks[0] + i*elementsPerThread);
@@ -108,17 +109,22 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
     } else {
       to = (&SeedBlocks[0] + (i+1)*elementsPerThread);
     }
-    string threadWork;
+    vector<consensus_pair> threadWork;
     buildConsensusPairsWorker(from, to, threadWork);
 #pragma omp critical 
     {
-      consensus_pairs += threadWork;
+      consensus_pairs.insert(consensus_pairs.end(), threadWork.begin(), threadWork.end());
     }
   }
   COMP(CNS_construction);
+  // pop the consensus_pair elements, and for each pop, add an element to
+  // tumour_cns and fastq_string. 
+  string fastq_data;
+  buildFastqAndTumourCNSData(consensus_pairs, fastq_data);
+
   cout << "<<<<<<<<<<<<<<Finished break point block construction" << endl;
   cout << "Writing consensus pairs as fastq" << endl;
-  writeConsensusPairs(consensus_pairs, outpath + basename + ".fastq.gz");
+  writeConsensusPairs(fastq_data, outpath + basename + ".fastq.gz");
   cout << "Time in enma:  " << extNonMut << endl;
   cout << "Time in genconseq:  " << genConSeq << endl;
   cout << "Time in noSNV:  " << noSNVTime << endl;
@@ -132,12 +138,26 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
 //COMP(SNVIdentifier_SNVIdentifier);
 }
 
-void SNVIdentifier::writeConsensusPairs(string const & consensus_pairs, string const & fname) {
-  cout << consensus_pairs.size() << endl;
+void SNVIdentifier::buildFastqAndTumourCNSData(std::list<consensus_pair> & consensus_pairs, string & fastq) {
+  int64_t index = 0;
+  tumour_cns.reserve(consensus_pairs.size());
+  while (!consensus_pairs.empty()) {
+    consensus_pair pair = consensus_pairs.front();
+    tumour_cns.push_back(pair.mutated);
+    string qual(pair.non_mutated.size(), '!');
+    fastq += "@" + std::to_string(index)  + ";" + to_string(pair.left_ohang) + 
+             ";" + to_string(pair.right_ohang) + "\n" + pair.non_mutated 
+             + "\n+\n" + qual + "\n";
+    ++index;
+    consensus_pairs.pop_front();
+  }
+}
+
+void SNVIdentifier::writeConsensusPairs(string const & fastq_data, string const & fname) {
   gzFile outfile = gzopen(fname.c_str(), "wb");
-  int64_t src_sz = consensus_pairs.size();
+  int64_t src_sz = fastq_data.size();
   int chunk = 0x4000;
-  char * src = const_cast<char*>(consensus_pairs.c_str());
+  char * src = const_cast<char*>(fastq_data.c_str());
   char * it = src;
   for (; (it + chunk)  < (src + src_sz); it += chunk) {
     if(gzwrite(outfile, it, chunk) != chunk) {
@@ -149,7 +169,7 @@ void SNVIdentifier::writeConsensusPairs(string const & consensus_pairs, string c
 }
 void SNVIdentifier::buildConsensusPairsWorker(shared_ptr<bpBlock> * block,
     shared_ptr<bpBlock> * end,
-    string & threadWork) {
+    vector<consensus_pair> & threadWork) {
 //START(SNVIdentifier_buildConsensusPairsWorker);
   for(; block < end; block++) {
     if ((*block)->size() > COVERAGE_UPPER_THRESHOLD) {
@@ -197,10 +217,11 @@ void SNVIdentifier::buildConsensusPairsWorker(shared_ptr<bpBlock> * block,
     if (noSNV(pair)) {
       continue;
     }
-    string qual(pair.non_mutated.size(), '!');
-    threadWork += "@" + pair.mutated + "[" + to_string(pair.left_ohang) + 
-               ";" + to_string(pair.right_ohang) + "]\n" + pair.non_mutated 
-               + "\n+\n" + qual + "\n";
+    threadWork.push_back(pair);
+    //string qual(pair.non_mutated.size(), '!');
+    //threadWork += "@" + pair.mutated + "[" + to_string(pair.left_ohang) + 
+    //           ";" + to_string(pair.right_ohang) + "]\n" + pair.non_mutated 
+    //           + "\n+\n" + qual + "\n";
   }
 }
 
@@ -557,8 +578,7 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
   cns_offset = max_offset;
   string q_str(width, '-');
   for (int pos=0; pos < width; pos++) {
-    // Mask position if there is < GSA_MCT2 reads supporting the chosen
-    // consensus character
+    // Mask position if there is < GSA_MCT2 reads contributing to consensus
     int nreads=0;
     for (int base=0; base < 4; base++) nreads += cnsCount[pos*4 + base];
     if (nreads < GSA2_MCT) {

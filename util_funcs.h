@@ -3,7 +3,6 @@ util_funcs.h
 Author: Izaak Coleman
 */
 
-
 #ifndef UTIL_FUNCS_H 
 #define UTIL_FUNCS_H
 

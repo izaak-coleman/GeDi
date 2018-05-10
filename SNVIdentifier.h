@@ -11,6 +11,7 @@ Author: Izaak Coleman
 #include <string>
 #include <iostream>
 #include <set>
+#include <list>
 #include <utility>
 #include <memory>
 
@@ -173,6 +174,7 @@ private:
   // information, used to align each read against its own block.
 
 
+
   int64_t backUpSearchStart(int64_t seed_index);
   // The worker threads that seed break point blocks from the second gsa
   // may begin block generation from the middle of block. 
@@ -220,7 +222,7 @@ private:
 
   void buildConsensusPairsWorker(std::shared_ptr<bpBlock> * block,
       std::shared_ptr<bpBlock> * end,
-      std::string & threadWork);
+      std::vector<consensus_pair> & threadWork);
   // Builds consensus pairs out of an allocated group of seed break point
   // blocks. 
 
@@ -342,6 +344,8 @@ private:
   std::pair<int64_t, int64_t> binarySearch(std::vector< std::pair<int64_t,
       int64_t> > const & bsa, int64_t sa_pos);
 
+  void buildFastqAndTumourCNSData(std::list<consensus_pair> & consensus_pairs, std::string & fastq);
+
   void mergeBlocks(bpBlock & to, bpBlock & from);
 
   void unifyBlocks(std::vector<bpBlock> & seedBlocks);
@@ -359,6 +363,7 @@ public:
   int64_t getSize();
   std::string addGaps(int ngaps);
   // adds gaps preceeding a read to give aligned output.
+  std::vector<std::string> tumour_cns;
 
   void printAlignedBlock(bpBlock block);
 

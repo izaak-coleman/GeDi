@@ -14,7 +14,7 @@ using namespace std;
 
 
 // //COMPULSORY SAM FIELDS
-const int SamEntry::HDR   = 0;
+const int SamEntry::TCNS  = 0;
 const int SamEntry::FLAG  = 1;
 const int SamEntry::RNAME = 2;
 const int SamEntry::POS   = 3;
@@ -30,7 +30,7 @@ const int SamEntry::QUAL  = 10;
 const int SamEntry::LEFT_OHANG = 11;
 const int SamEntry::RIGHT_OHANG = 12;
 
-SamEntry::SamEntry(string const& entry) {
+SamEntry::SamEntry(string const& entry, vector<string> const & tumour_cns) {
   vector<string> fields;
   split_string(entry, "\t", fields);
   del = false;
@@ -41,25 +41,21 @@ SamEntry::SamEntry(string const& entry) {
   pnext= stoi(fields[SamEntry::PNEXT]); 
   tlen = stoi(fields[SamEntry::TLEN]); 
 
+  // Parse header
+  vector<string> header_subs;
+  split_string(fields[0], ";", header_subs);
+  index = stoi(header_subs[0]);
+  left_ohang = stoi(header_subs[1]);
+  right_ohang = stoi(header_subs[2]);
+
   // strings
+  t_cns = tumour_cns[index];
   rname = fields[SamEntry::RNAME]; 
   cigar = fields[SamEntry::CIGAR]; 
   rnext = fields[SamEntry::RNEXT]; 
   seq   = fields[SamEntry::SEQ]; 
   qual  = fields[SamEntry::QUAL]; 
 
-  // Parse header
-  vector<string> header_subs;
-  // split off the cancer cns
-  split_string(fields[SamEntry::HDR], "[", header_subs);
-  hdr = header_subs[0];
-  // cut of the end "]" char
-  fields[SamEntry::HDR] = header_subs[1].substr(0, header_subs[1].length()-1);
-  // split up the remaining fields
-  header_subs.clear();
-  split_string(fields[SamEntry::HDR], ";", header_subs);
-  left_ohang = stoi(header_subs[0]);
-  right_ohang = stoi(header_subs[1]);
 }
 
 
@@ -73,7 +69,7 @@ bool SamEntry::containsIndel() {
 void SamEntry::free() {
   del = true;
   SNVLocations.clear();
-  hdr.clear();
+  t_cns.clear();
   rname.clear();
   cigar.clear();
   rnext.clear();

@@ -57,6 +57,7 @@ GenomeMapper::GenomeMapper(SNVIdentifier &snv,
 
   cout << "Identifying SNV" << endl;
   identifySNVs(alignments);
+  snvId->tumour_cns.clear();
 
   getrusage(RUSAGE_SELF, &rss);
   cout << "RSS after identifyingSNVs()" << rss.ru_maxrss << endl;
@@ -74,7 +75,7 @@ void GenomeMapper::parseSamFile(vector<SamEntry*> &alignments, string filename) 
   string line;
   while(getline(snvSam, line)) {
     if (boost::regex_match(line, rgx_header)) continue;
-    SamEntry * entry = new SamEntry(line); 
+    SamEntry * entry = new SamEntry(line, snvId->tumour_cns); 
     if (get<string>(SamEntry::RNAME, entry) != CHR && CHR != "") {
       delete entry;
       entry = nullptr;
@@ -101,7 +102,7 @@ void GenomeMapper::identifySNVs(vector<SamEntry*> &alignments) {
     }
     else if (get<int>(SamEntry::FLAG, entry) == REVERSE_FLAG) {
       CigarParser cp(get<string>(SamEntry::CIGAR, entry));
-      entry->set(SamEntry::HDR, reverseComplementString(get<string>(SamEntry::HDR, entry))); 
+      entry->set(SamEntry::TCNS, reverseComplementString(get<string>(SamEntry::TCNS, entry))); 
       countSNVs(entry, get<int>(SamEntry::RIGHT_OHANG, entry), cp); // invert overhangs due to rev comp
     }
   }
@@ -156,7 +157,7 @@ int GenomeMapper::calibrateWithCIGAR(int SNVPos, CigarParser const & cp) {
 void GenomeMapper::countSNVs(SamEntry * &alignment, int ohang, CigarParser const
     & cp) {
 //START(GenomeMapper_countSNVs);
-  string mutated = get<string>(SamEntry::HDR, alignment);
+  string mutated = get<string>(SamEntry::TCNS, alignment);
   string nonMutated = get<string>(SamEntry::SEQ, alignment);
   bool noSNVs = true;
   for(int i=0; i < mutated.size() - 1; i++) {

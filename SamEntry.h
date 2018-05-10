@@ -24,14 +24,15 @@ public:
   int tlen;
   int left_ohang;
   int right_ohang;
+  int index;
 
   // strings 
-  std::string hdr;
+  std::string t_cns;
   std::string rname;
   std::string cigar;
   std::string rnext;
-  std::string seq;
-  std::string qual;
+  std::string seq;  // which is the healthy cns
+  std::string qual; 
 
   /* For the following three vectors SNVLocations[i] specifies an SNV at
    * genome location pos + SNVLocations[i], for which the healthy dataset
@@ -51,7 +52,7 @@ public:
   bool del;
 
   // keys
-  static const int HDR;  
+  static const int TCNS;  
   static const int FLAG;
   static const int RNAME;
   static const int POS;
@@ -67,7 +68,7 @@ public:
   static const int BLOCK_ID;
 
 
-  SamEntry(std::string const& line); 
+  SamEntry(std::string const& line, std::vector<std::string> const & tumour_cns); 
   // Separates fields, discards any non compulsory fields. 
 
   bool containsIndel(); 
@@ -96,7 +97,7 @@ public:
   }
   void set(int k, std::string const& v) {
     switch (k) {
-      case 0:  hdr   = v; break;
+      case 0:  t_cns = v; break;
       case 2:  rname = v; break;
       case 5:  cigar = v; break;
       case 6:  rnext = v; break;
