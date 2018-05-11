@@ -100,7 +100,7 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
   }
 
   std::list<consensus_pair> consensus_pairs;
-#pragma omp parallel for 
+#pragma omp parallel for ordered
   for (int i = 0; i < n_threads; i++) {
     shared_ptr<bpBlock> * from = (&SeedBlocks[0] + i*elementsPerThread);
     shared_ptr<bpBlock> * to;
@@ -111,7 +111,7 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
     }
     vector<consensus_pair> threadWork;
     buildConsensusPairsWorker(from, to, threadWork);
-#pragma omp critical 
+#pragma omp ordered
     {
       consensus_pairs.insert(consensus_pairs.end(), threadWork.begin(), threadWork.end());
     }
