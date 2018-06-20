@@ -39,7 +39,7 @@ static const int PHRED_UBOUND = 42;
 // Default option values
 static const int    GSA1_MCT               = 1;
 static const int    GSA2_MCT               = 4; 
-static const int    MAX_LOW_CONFIDENCE_POS = 10;
+static const int    MAX_LOW_CONFIDENCE_POS = 5;
 static const int    ECONT                  = 0;
 static const int    MIN_PHRED_QUAL         = 22; 
 static const int    MIN_MAPQ               = 42;

@@ -44,8 +44,8 @@ GenomeMapper::GenomeMapper(SNVIdentifier &snv,
          outName(outpath + basename + ".SNV_results");
 
   cout << "Aligning consensus pairs with Bowtie2" << endl;
-  string command_aln("~/GeDi/bowtie2-2.3.1/bowtie2 -p 16 -x " + bwt_idx + " -U " +
-                     fastqName + " -S " + samName);
+  string command_aln("~/GeDi/bowtie2-2.3.1/bowtie2 -p 16 -x " + bwt_idx + " -U "
+      + fastqName + " -S " + samName);
   system(command_aln.c_str());
   vector<SamEntry*> alignments;
   cout << "Parsing sam" << endl;
