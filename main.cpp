@@ -41,11 +41,12 @@ static const int    GSA1_MCT               = 1;
 static const int    GSA2_MCT               = 4; 
 static const int    MAX_LOW_CONFIDENCE_POS = 5;
 static const int    ECONT                  = 0;
-static const int    MIN_PHRED_QUAL         = 22; 
+static const int    MIN_PHRED_QUAL         = 35; 
 static const int    MIN_MAPQ               = 42;
 static const double ALLELE_FREQ_OF_ERR     = 0.1; 
 static const string OUTPUT_PATH            = "./"; 
 static const string CHR                    = "";
+static const string EMFIL                  = "on";
 
 
 int main(int argc, char** argv) 
@@ -57,6 +58,9 @@ int main(int argc, char** argv)
       ("help", "Print options description.\n") 
       ("gsa1_mct,1",  po::value<int>()->default_value(GSA1_MCT), 
        "Minimum group size extracted from the first GSA. Integer.\n")
+
+      ("em_filtering", po::value<string>()->default_value(EMFIL),
+       "Apply exact match preprocessing stage to tumour input data.\n")
 
       ("gsa2_mct,2",  po::value<int>()->default_value(GSA2_MCT), 
        "Minimum group size extracted from the second GSA. Integer.\n")
@@ -123,6 +127,15 @@ int main(int argc, char** argv)
       if (vm["min_phred"].as<int>() < PHRED_LBOUND || vm["min_phred"].as<int>() > PHRED_UBOUND) {
         std::cerr << "ERROR: " 
                   << "--min_phred must take integer value in range [0-42]."
+                  << std::endl << std::endl
+                  << "Refer to --help for input desciption." << std::endl
+                  << "Program terminating." << std::endl;
+        return ERROR_IN_COMMAND_LINE;
+      }
+      if (vm["em_filtering"].as<string>() != "on" &&
+          vm["em_filtering"].as<string>() != "off") {
+        std::cerr << "ERROR: " 
+                  << "--em_filtering must take value 'on' or 'off'"
                   << std::endl << std::endl
                   << "Refer to --help for input desciption." << std::endl
                   << "Program terminating." << std::endl;
@@ -243,7 +256,8 @@ int main(int argc, char** argv)
     // Run GeDi
     INITRSS(GeDi);
     START(GeDi);
-    GSA gsa(vm["input_files"].as<string>(), vm["n_threads"].as<int>());
+    GSA gsa(vm["input_files"].as<string>(), vm["n_threads"].as<int>(),
+            vm["bt2-idx"].as<string>(), vm["em_filtering"].as<string>());
 
 
     SNVIdentifier snvId(gsa, 

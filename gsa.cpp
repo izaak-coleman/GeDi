@@ -27,6 +27,7 @@ static const          string TUMOUR_DATA  = "T";
 static const char     PHRED_20 = '5';
 static const double   QUAL_THRESH = 0.1;
 static const char     REMOVED_TOKEN = 'N';
+static const string   ON = "on";
 
 void GSA::split_string(string const & s, string const & tokens, vector<string> &split_strings) {
   char *c_s = const_cast<char*>(s.c_str());
@@ -47,7 +48,7 @@ int64_t GSA::get_min_suf_size() {
 }
 
 
-GSA::GSA(string const& header_fname, int t) {
+GSA::GSA(string const& header_fname, int t, string const & ref, string const & em_filtering) {
   N_THREADS = t;
   max_read_len = 0;
   tsi = 0;
@@ -60,9 +61,17 @@ GSA::GSA(string const& header_fname, int t) {
     load_fq_data(f);
   }
   tsi = concat.size();
-  for (string const & f : t_fnames) {
-    cout << f << endl;
-    load_fq_data(f);
+  if (em_filtering != ON) {
+    for (string const & f : t_fnames) {
+      cout << f << endl;
+      load_fq_data(f);
+    }
+  }
+  else {
+    for (string const & f : t_fnames) {
+      cout << f << endl;
+      em_filter(ref, f);
+    }
   }
   cout << "CONCAT: " << concat.size() << endl;
   cout << "TSI: "  << tsi << endl;
@@ -80,32 +89,60 @@ GSA::GSA(string const& header_fname, int t) {
   COMP(rem_short_suf);
 }
 
+void GSA::em_filter(string const & ref, string const & f) {
+  // run bowtie2
+  cout << "Calling bowtie to align" << f << endl;
+  string command_aln("~/GeDi/bowtie2-2.3.1/bowtie2 -p 16 -x " + ref + " -U "
+      + f + " -S " + f + ".sam");
+  system(command_aln.c_str());
+  cout << "finished bowtie call" << endl;
+  string sf = f + ".sam";
+  cout << sf << endl;
+  ifstream sam(sf.c_str()); // attach stream to samfile
+
+  for (string line; getline(sam,line);) {
+    if (line[0] == '@') continue;
+
+    int64_t nm_index = line.find("NM:i:");
+    if (nm_index != string::npos) {
+      nm_index +=5;
+      if (line[nm_index] == '0') continue; // read is exact match
+    }
+    // remaining reads are inexactly matched, or failed alignment
+    vector<string> fields;
+    split_string(line, "\t", fields);
+    if (!fields[10].empty() && good_quality(fields[10])) {
+      add_fq_data(fields[9], fields[10]);
+    }
+  }
+  sam.close();
+  remove(sf.c_str()); // delete samfile
+}
+
+
 void GSA::load_fq_data(string const & fname) {
   gzFile data;
   data = gzopen(fname.c_str(), "r");
   kseq_t *fq = kseq_init(data);
   while (kseq_read(fq) >= 0) {
-    if (fq->qual.l && good_quality(fq)) {
-      add_fq_data(fq);
+    if (fq->qual.l && good_quality(fq->qual.s)) {
+      add_fq_data(fq->seq.s, fq->qual.s);
     }
   }
   kseq_destroy(fq);
   gzclose(data);
 }
 
-bool GSA::good_quality(void const * vpt) {
-  kseq_t * fq = (kseq_t*) vpt;
+bool GSA::good_quality(string const & q) {
   double n_lowq_bases{0.0};
-  for (char const* it = fq->qual.s; it < (fq->qual.s + fq->qual.l); it++) {
-    if (*it < PHRED_20) ++n_lowq_bases; 
+  for (int64_t i = 0; i < q.size(); i++) {
+    if (q[i] < PHRED_20) ++n_lowq_bases; 
   }
-  if ((n_lowq_bases / fq->qual.l) > QUAL_THRESH) return false;
+  if ((n_lowq_bases / q.size()) > QUAL_THRESH) return false;
   else return true;
 }
 
-void GSA::add_fq_data(void const * vpt) {
-  kseq_t * fq = (kseq_t*) vpt;
-  string seq(fq->seq.s), qual(fq->qual.s);
+void GSA::add_fq_data(string const & seq, string const & qual) {
   vector<string> read_substrs;
   vector<string> phred_substrs;
   int left_arrow{0}, right_arrow{0};

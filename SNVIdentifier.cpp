@@ -640,7 +640,7 @@ void SNVIdentifier::buildQualityString(string & qual, vector<int> const& freq_ma
     for (int base = 0; base < 4; base++) total_bases += freq_matrix[pos*4 + base];
     int n_bases_above_err_freq{0};
     for(int base = 0; base < 4; base++) {
-      if((freq_matrix[pos*4 + base] / total_bases) > ALLELIC_FREQ_OF_ERROR) {
+      if ((freq_matrix[pos*4 + base] / total_bases) > ALLELIC_FREQ_OF_ERROR) {
         n_bases_above_err_freq++;
       }
     }

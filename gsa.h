@@ -35,8 +35,8 @@ class GSA {
 private:
   void constructConcat(std::string const & fname);
   void load_fq_data(std::string const & fname);
-  bool good_quality(void const * fq);
-  void add_fq_data(void const * fq);
+  bool good_quality(std::string const & q);
+  void add_fq_data(std::string const & fq, std::string const & q);
   void read_header(std::string const & header_fname, std::vector<std::string> & h_fnames, 
                    std::vector<std::string> & t_fnames);
   void split_string(std::string const & s, std::string const& tokens, std::vector<std::string>
@@ -48,9 +48,10 @@ private:
   void xorSwap(int64_t *x, int64_t *y); // swap *x with *y
 
   int64_t bubbleRemove(int64_t * const a, int64_t const sz, int64_t const invalid);
+  void em_filter(std::string const & ref, std::string const & f);
 
 public:
-  GSA(std::string const & header_fname, int t); // inits all class members
+  GSA(std::string const & header_fname, int t, std::string const & ref, std::string const & em_filtering); // inits all class members
   ~GSA(); // free sa
 
   bool tissuetype(int64_t const i); // returns TUMOUR/HEALTHY

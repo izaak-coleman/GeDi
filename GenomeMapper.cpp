@@ -71,10 +71,9 @@ GenomeMapper::GenomeMapper(SNVIdentifier &snv,
 void GenomeMapper::parseSamFile(vector<SamEntry*> &alignments, string filename) {
 //START(GenomeMapper_parseSamFile);
   ifstream snvSam(filename);
-  boost::regex rgx_header("(@).*");
   string line;
   while(getline(snvSam, line)) {
-    if (boost::regex_match(line, rgx_header)) continue;
+    if (line[0] == '@') continue;
     SamEntry * entry = new SamEntry(line, snvId->tumour_cns); 
     if (get<string>(SamEntry::RNAME, entry) != CHR && CHR != "") {
       delete entry;
