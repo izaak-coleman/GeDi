@@ -253,12 +253,12 @@ int main(int argc, char** argv)
                 << "Program terminating." << std::endl;
       return ERROR_IN_COMMAND_LINE; 
     } 
+
     // Run GeDi
     INITRSS(GeDi);
     START(GeDi);
     GSA gsa(vm["input_files"].as<string>(), vm["n_threads"].as<int>(),
             vm["bt2-idx"].as<string>(), vm["em_filtering"].as<string>());
-
 
     SNVIdentifier snvId(gsa, 
                          vm["output_path"].as<string>(),
