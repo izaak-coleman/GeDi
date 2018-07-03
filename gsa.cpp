@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
+#include <algorithm>
 #include <unistd.h>
 #include <fcntl.h>
 #include <zlib.h>
@@ -112,6 +113,10 @@ void GSA::em_filter(string const & ref, string const & f) {
     vector<string> fields;
     split_string(line, "\t", fields);
     if (!fields[10].empty() && good_quality(fields[10])) {
+      if (fields[1] == "16") {
+        fields[9] = reverseComplementString(fields[9]);
+        std::reverse(fields[10].begin(), fields[10].end());
+      }
       add_fq_data(fields[9], fields[10]);
     }
   }

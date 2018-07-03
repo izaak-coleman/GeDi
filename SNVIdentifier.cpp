@@ -606,7 +606,7 @@ void SNVIdentifier::extractionWorker(int64_t seed_index, int64_t to, set<int64_t
     if (extension - seed_index == 1 && GSA1_MCT   == 1 && gsa->tissuetype(seed_index) == TUMOUR) {
       threadExtr.insert(gsa->read_id_of_suffix(gsa->sa_element(seed_index)));           // extract read
     }
-    else if (c_reads >= GSA1_MCT  && (h_reads / c_reads) <= ECONT)  {
+    else if (c_reads >= GSA1_MCT  && (h_reads / (c_reads + h_reads)) <= ECONT)  {
      // cout << "Inserted" << endl;
       for (int64_t i = seed_index; i < extension; i++) {
         if (gsa->tissuetype(gsa->sa_element(i)) == TUMOUR) {
