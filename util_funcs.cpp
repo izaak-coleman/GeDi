@@ -53,6 +53,7 @@ string reverseComplementString(string const& s){
       case 'T': revcomp += "A"; break;
       case 'C': revcomp += "G"; break;
       case 'G': revcomp += "C"; break;
+      case 'N': revcomp += "N"; break;
     }
   }
   return revcomp;
