@@ -352,6 +352,9 @@ private:
 
   void printExtractedCancerReads();
 
+  bool singleIndel(std::string const & cigar);
+  bool containsIndel(std::string const & tumour, std::string const & control);
+
 public:
   SNVIdentifier(GSA & gsa, std::string outpath, 
                     std::string const& basename, 

@@ -27,6 +27,7 @@ Author: Izaak Coleman
 #include "util_funcs.h"
 #include "SNVIdentifier.h"
 #include "GenomeMapper.h"
+#include "ssw_cpp.h"
 
 #include "benchmark.h"
 using namespace std;
@@ -176,6 +177,15 @@ void SNVIdentifier::buildConsensusPairsWorker(shared_ptr<bpBlock> * block,
     if (pair.mutated.empty() || pair.non_mutated.empty()) {
       continue;
     }
+    // check prior to masking to remove pairs for which containsIndel
+    // would be uneccessarily applied
+    if (noSNV(pair)) {
+      continue;
+    }
+
+    if (containsIndel(pair.mutated, pair.non_mutated)) {
+      continue;
+    }
     maskLowQualityPositions(pair);
 
     if (noSNV(pair)) {
@@ -187,6 +197,54 @@ void SNVIdentifier::buildConsensusPairsWorker(shared_ptr<bpBlock> * block,
     //           ";" + to_string(pair.right_ohang) + "]\n" + pair.non_mutated 
     //           + "\n+\n" + qual + "\n";
   }
+}
+
+bool SNVIdentifier::singleIndel(string const & cigar) {
+  int n_indels = 0;
+  int mismatch_or_clip = 0;
+  int pos = 0;
+
+  // mismatch
+  while ((pos = cigar.find('X', pos)) != string::npos) {
+    pos++;
+    mismatch_or_clip++;
+  }
+  pos = 0;
+  // clip
+  while ((pos = cigar.find('S', pos)) != string::npos) {
+    pos++;
+    mismatch_or_clip++;
+  }
+  pos = 0;
+  // Count insertions
+  while ((pos = cigar.find('I', pos)) != string::npos) {
+    pos++;
+    n_indels++;
+  }
+  // Count deletions
+  pos = 0;
+  while ((pos = cigar.find('D', pos)) != string::npos) {
+    pos++;
+    n_indels++;
+  }
+  return ((n_indels == 1 && mismatch_or_clip == 0) ? true : false);
+}
+
+bool SNVIdentifier::containsIndel(string const & tumour, string const & control) {
+  // if (consecutiveMismatch()) return true;
+  // requirement of SW library 
+  int32_t maskLen = strlen(tumour.c_str())/2;
+  maskLen = maskLen < 15 ? 15 : maskLen;
+  
+  /* Since we are interested only in identifying Indels, set
+   * gap/extension penalty to zero. Accordingly, if an indel exists, the
+   * gaped alignemnt will be the highest scoring.*/
+  StripedSmithWaterman::Aligner aligner(1,1,0,0);
+  StripedSmithWaterman::Filter filter;
+  StripedSmithWaterman::Alignment alignment;
+  aligner.Align(tumour.c_str(), control.c_str(), control.size(), filter, &alignment, maskLen);
+  if (singleIndel(alignment.cigar_string)) return true;
+  else return false;
 }
 
 void SNVIdentifier::printAlignedBlock(bpBlock block) {

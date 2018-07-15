@@ -153,20 +153,31 @@ int GenomeMapper::calibrateWithCIGAR(int SNVPos, CigarParser const & cp) {
 }
 
 
+bool GenomeMapper::contiguousMismatch(string const & mutated, string const & nonMutated, int ohang) {
+  bool noSNVs = true;
+  for(int i=0; i < mutated.size() - 1; i++) {
+    if (mutated[i] != nonMutated[i + ohang] &&
+        mutated[i+1] != nonMutated[i+1 + ohang]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+
 void GenomeMapper::countSNVs(SamEntry * &alignment, int ohang, CigarParser const
     & cp) {
 //START(GenomeMapper_countSNVs);
   string mutated = get<string>(SamEntry::TCNS, alignment);
   string nonMutated = get<string>(SamEntry::SEQ, alignment);
   bool noSNVs = true;
-  for(int i=0; i < mutated.size() - 1; i++) {
-    if (mutated[i] != nonMutated[i + ohang] &&
-        mutated[i+1] != nonMutated[i+1 + ohang]) {
-      delete alignment;
-      alignment = nullptr;
-      return;
-    }
+  if (contiguousMismatch(mutated, nonMutated, ohang)) {
+    delete alignment;
+    alignment = nullptr;
+    return;
   }
+
+  // SNV at start
   if (mutated[0] != nonMutated[0 + ohang] &&
       mutated[1] == nonMutated[1 + ohang]) {
       alignment->mutatedBases.push_back(mutated[0]);

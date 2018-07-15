@@ -59,6 +59,8 @@ private:
   // contained within CIGAR, such that the SNVPos is referencing the 
   // correct reference genome index.
 
+  bool contiguousMismatch(std::string const & tumour, std::string const & control, int ohang);
+
   
 
 public:
