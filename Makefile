@@ -21,3 +21,6 @@ clean:
 cleaner:
 	rm ./$(EXE)
 
+
+
+  testing
