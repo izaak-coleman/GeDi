@@ -37,12 +37,12 @@ static const int PHRED_LBOUND = 0;
 static const int PHRED_UBOUND = 42;
 
 // Default option values
-static const int    GSA1_MCT               = 1;
-static const int    GSA2_MCT               = 4; 
-static const int    MAX_LOW_CONFIDENCE_POS = 5;
+static const int    PRI_MSS                = 2;
+static const int    AUX_MSS                = 4; 
+static const int    MAX_SNPS               = 5;
 static const int    ECONT                  = 0;
 static const int    MIN_PHRED_QUAL         = 35; 
-static const int    MIN_MAPQ               = 42;
+static const int    MIN_MAPQ               = 0;
 static const double ALLELE_FREQ_OF_ERR     = 0.1; 
 static const string OUTPUT_PATH            = "./"; 
 static const string CHR                    = "";
@@ -55,53 +55,68 @@ int main(int argc, char** argv)
     namespace po = boost::program_options; 
     po::options_description desc("Options"); 
     desc.add_options() 
-      ("help", "Print options description.\n") 
-      ("gsa1_mct,1",  po::value<int>()->default_value(GSA1_MCT), 
-       "Minimum group size extracted from the first GSA. Integer.\n")
+      ("help", "Print options description.") 
+      ("primary_mss",  po::value<int>()->default_value(PRI_MSS), 
+       "Minimum suffix size of sections extracted from the primary " 
+       "suffix array. Integer ranged [1, maxint].\n")
 
-      ("em_filtering", po::value<string>()->default_value(EMFIL),
-       "Apply exact match preprocessing stage to tumour input data.\n")
+      ("emfilter", po::value<string>()->default_value(EMFIL),
+       "Apply emfilter to input tumour data.(on|off)\n")
 
-      ("gsa2_mct,2",  po::value<int>()->default_value(GSA2_MCT), 
-       "Minimum group size extracted from the second GSA. Integer.\n")
+      ("auxiliary_mss",  po::value<int>()->default_value(AUX_MSS), 
+       "Minimum suffix size of sections extracted from the auxiliary GSA. " 
+       "Integer ranged [1, maxint].\n")
 
       ("min_phred,h", po::value<int>()->default_value(MIN_PHRED_QUAL),
-       "Minimum allowed phred score of any character that contributes to a consensus sequence. Base-33 phred score. Integer ranged [0-42]\n")
+       "Minimum phred score of base contributing to a phred-filtered " 
+       "consensus sequence Base-33 phred score. Integer ranged [0,42]\n")
 
       ("max_allele_freq_of_error,f", po::value<double>()->default_value(ALLELE_FREQ_OF_ERR), 
-       "Maximum allelic frequency of a base within an aligned block that is considered an error frequency. Real number ranged [0-1].\n")
+       "All candidate variants with an allele frequency equal to or below "
+        "this value will be considered sequencing errors and discarded. " 
+        "Real number ranged [0,1]\n")
       
-      ("max_low_confidence_positions,l",
-       po::value<int>()->default_value(MAX_LOW_CONFIDENCE_POS),
-       "Maximum number of low confidence positions allowed per block before the block is discarded. Integer.\n")
+      ("max_SNPs,l",
+       po::value<int>()->default_value(MAX_SNPS),
+       "Max number of SNPs in consensus sequence allowed before multi-locus " 
+       "filter will be triggered, resulting in the consensus pair being " 
+       "discarded. Integer [0, maxint]. \n")
 
       ("min_mapq,q", po::value<int>()->default_value(MIN_MAPQ),
-       "Defines the minimum Bowtie2 MAPQ score of the aligned healthy consensus sequence of a consensus pair that permits the consensus pair to undergo further analysis. Integer ranged [0-42].\n")
+       "Aligned control consensus sequences with a Bowtie2 given MAPQ score " 
+       "below this value will be discarded. Integer ranged [0,42] \n.")
 
       ("expected_contamination,e", po::value<double>()->default_value(ECONT),
-       "Proportion of cancer data set expected to contain healthy derived reads. Real number ranged [0-1].\n")
+       "Proportion of cancer dataset expected to contain healthy-tissue " 
+       "derived reads. Real number ranged [0,1].\n")
 
-      ("output_path,p", po::value<string>()->default_value(OUTPUT_PATH), 
-       "Path specifying write location of <output_prefix>.SNV_results <output_prefix>.fastq and <output_prefix>.out\n")
+      ("output_dir,p", po::value<string>()->default_value(OUTPUT_PATH), 
+       "path to output directory, where <output_prefix>.SNV_results, " 
+       "<output_prefix>.fastq.gz and <output_prefix>.sam will be written.\n")
 
       ("chromosome,c", po::value<string>()->default_value(CHR), 
-       "Target chromosome for SNV calling. Only sam entries with an RNAME = <chromosome> will be extracted from the sam file. Not specifying runs non-targeted mode.\n")
+       "For targeted sequencing data analysis. Only control consensus "  
+       "consensus sequenceswith RNAME identical to the given value "  
+       "will be considered for further analysis. Leaving this unspecified "  
+       "removes constraint, allowing GeDi to analyse WGS datasets. \n")
 
       ("expected_coverage,v", po::value<int>()->required(), 
-       "Expected coverage of input datasets. Integer. Required.\n")
+       "Expected coverage of input datasets. Integer range [0,maxint]. Required.\n")
 
       ("n_threads,t", po::value<int>()->required(), 
-       "Number of threads. Integer. Required.\n")
+       "Number of threads. Integer. Required ranged [1,maxint].\n")
 
 
       ("input_files,i", po::value<string>()->required(), 
-       "Path and name of file containing the input file list. Required.\n")
+       "Path and name of file containing list of input fastq files. Required.\n")
 
       ("bt2-idx,x", po::value<string>()->required(), 
-       "Basename of the index for the reference genome. Specified value should be identical to Bowtie2's -x option. Required.\n")
+       "Basename of Bowtie2 reference genome index. Specified value " 
+       "should be identical to Bowtie2's -x option if running Bowtie2 " 
+       "from GeDi. Required.\n")
 
       ("output_basename,o", po::value<string>()->required(), 
-       "Basename for output SNV call file (SNV_results), consensus fastq and sam alignment. Required.\n");
+       "Basename for SNV_results, fastq.gz, sam files output by GeDi. Required.\n");
 
  
     po::variables_map vm; 
@@ -113,8 +128,7 @@ int main(int argc, char** argv)
                   << "* Generalized Suffix Array based Direct Comparison (GeDi) SNV caller. *" << std::endl
                   << "***********************************************************************" << std::endl
                   << std::endl << std::endl;
-        std::cout << "usage: [-1 1_arg] [-2 2_arg] [-h h_arg] [-f f_arg] [-e e_arg]"
-                  << " [-p p_arg] -v v_arg -t t_arg -c c_arg -i i_arg -x x_arg -o o_arg" 
+        std::cout << "usage: [optional parameters] -v coverage -t n_threads -i fastq_list -x bowtie_index -o output_file_basename"
                   << std::endl;
         std::cout << desc 
                   << std::endl; 
@@ -128,32 +142,32 @@ int main(int argc, char** argv)
         std::cerr << "ERROR: " 
                   << "--min_phred must take integer value in range [0-42]."
                   << std::endl << std::endl
-                  << "Refer to --help for input desciption." << std::endl
+                  << "Read --help for required and default parameters." << std::endl
                   << "Program terminating." << std::endl;
         return ERROR_IN_COMMAND_LINE;
       }
-      if (vm["em_filtering"].as<string>() != "on" &&
-          vm["em_filtering"].as<string>() != "off") {
+      if (vm["emfilter"].as<string>() != "on" &&
+          vm["emfilter"].as<string>() != "off") {
         std::cerr << "ERROR: " 
-                  << "--em_filtering must take value 'on' or 'off'"
+                  << "--emfilter must take value 'on' or 'off'"
                   << std::endl << std::endl
-                  << "Refer to --help for input desciption." << std::endl
+                  << "Read --help for required and default parameters." << std::endl
                   << "Program terminating." << std::endl;
         return ERROR_IN_COMMAND_LINE;
       }
-      if (vm["gsa1_mct"].as<int>() < 1) {
+      if (vm["primary_mss"].as<int>() < 1) {
         std::cerr << "ERROR: " 
-                  << "--gsa1_mct must be at least 1."
+                  << "--primary_mss must be at least 1."
                   << std::endl << std::endl
-                  << "Refer to --help for input desciption." << std::endl
+                  << "Read --help for required and default parameters." << std::endl
                   << "Program terminating." << std::endl;
         return ERROR_IN_COMMAND_LINE;
       }
-      if (vm["gsa2_mct"].as<int>() < 1) {
+      if (vm["auxiliary_mss"].as<int>() < 1) {
         std::cerr << "ERROR: " 
-                  << "--gsa2_mct must be at least 1."
+                  << "--auxiliary_mss must be at least 1."
                   << std::endl << std::endl
-                  << "Refer to --help for input desciption." << std::endl
+                  << "Read --help for required and default parameters." << std::endl
                   << "Program terminating." << std::endl;
         return ERROR_IN_COMMAND_LINE;
       }
@@ -162,7 +176,7 @@ int main(int argc, char** argv)
         std::cerr << "ERROR: " 
                   << "--max_allele_freq_of_error must a real number in range [0-1]."
                   << std::endl << std::endl
-                  << "Refer to --help for input desciption." << std::endl
+                  << "Read --help for required and default parameters." << std::endl
                   << "Program terminating." << std::endl;
         return ERROR_IN_COMMAND_LINE;
       }
@@ -172,7 +186,7 @@ int main(int argc, char** argv)
                   << "--expected_contamination must a real number in range [0-1]."
 
                   << std::endl << std::endl
-                  << "Refer to --help for input desciption." << std::endl
+                  << "Read --help for required and default parameters." << std::endl
                   << "Program terminating." << std::endl;
         return ERROR_IN_COMMAND_LINE;
       }
@@ -180,7 +194,7 @@ int main(int argc, char** argv)
         std::cerr << "ERROR: " 
                   << "--expected_coverage must be at least 0."
                   << std::endl << std::endl
-                  << "Refer to --help for input desciption." << std::endl
+                  << "Read --help for required and default parameters." << std::endl
                   << "Program terminating." << std::endl;
         return ERROR_IN_COMMAND_LINE;
       }
@@ -188,15 +202,15 @@ int main(int argc, char** argv)
         std::cerr << "ERROR: " 
                   << "--n_threads must be at least 1."
                   << std::endl << std::endl
-                  << "Refer to --help for input desciption." << std::endl
+                  << "Read --help for required and default parameters." << std::endl
                   << "Program terminating." << std::endl;
         return ERROR_IN_COMMAND_LINE;
       }
-      if (vm["max_low_confidence_positions"].as<int>() < 0) {
+      if (vm["max_SNPs"].as<int>() < 0) {
         std::cerr << "ERROR: " 
-                  << "--max_low_confidence_positions must be at least 0."
+                  << "--max_SNPs must be at least 0."
                   << std::endl << std::endl
-                  << "Refer to --help for input desciption." << std::endl
+                  << "Read --help for required and default parameters." << std::endl
                   << "Program terminating." << std::endl;
         return ERROR_IN_COMMAND_LINE;
       }
@@ -205,7 +219,7 @@ int main(int argc, char** argv)
         std::cerr << "ERROR: " 
                   << "--min_mapq must be an integer value in range [0-42]."
                   << std::endl << std::endl
-                  << "Refer to --help for input desciption." << std::endl
+                  << "Read --help for required and default parameters." << std::endl
                   << "Program terminating." << std::endl;
         return ERROR_IN_COMMAND_LINE;
       }
@@ -214,7 +228,7 @@ int main(int argc, char** argv)
       if (stat(vm["output_path"].as<string>().c_str(), &info_p) != 0) {
         std::cerr << "ERROR: "
                   << "Cannot access " << vm["output_path"].as<string>()
-                  << std::endl << "Please check path exists / is correct."
+                  << std::endl << "Please check path is correct."
                   << std::endl
                   << "Program terminating." << std::endl;
         return ERROR_IN_COMMAND_LINE;
@@ -222,7 +236,7 @@ int main(int argc, char** argv)
       else if (!(info_p.st_mode & S_IFDIR)) {
         std::cerr << "ERROR: "
                   << vm["output_path"].as<string>() 
-                  << " does not exist. Please make required directories"
+                  << " cannot be found. Please check directory exists."
                   << std::endl << "before running GeDi." 
                   << std::endl
                   << "Program terminating." << std::endl;
@@ -232,7 +246,7 @@ int main(int argc, char** argv)
       if (stat(vm["input_files"].as<string>().c_str(), &info_i) != 0) {
         std::cerr << "ERROR: "
                   << "Cannot access " << vm["input_files"].as<string>()
-                  << std::endl << "Please check path to file / filename."
+                  << std::endl << "Please check filename is correct."
                   << std::endl
                   << "Program terminating." << std::endl;
         return ERROR_IN_COMMAND_LINE;
@@ -240,7 +254,7 @@ int main(int argc, char** argv)
       else if (!(info_p.st_mode & S_IFDIR)) {
         std::cerr << "ERROR: "
                   << vm["input_files"].as<string>() 
-                  << " cannot be found. Please check path to file/filename."
+                  << " cannot be found. Please check filename is correct."
                   << std::endl
                   << "Program terminating." << std::endl;
         return ERROR_IN_COMMAND_LINE;
@@ -249,7 +263,7 @@ int main(int argc, char** argv)
     catch(po::error& e) 
     { 
       std::cerr << "ERROR: " << e.what() << std::endl << std::endl; 
-      std::cerr << desc << std::endl
+      std::cerr << "Read --help for required and default parameters." << std::endl
                 << "Program terminating." << std::endl;
       return ERROR_IN_COMMAND_LINE; 
     } 
@@ -258,17 +272,17 @@ int main(int argc, char** argv)
     INITRSS(GeDi);
     START(GeDi);
     GSA gsa(vm["input_files"].as<string>(), vm["n_threads"].as<int>(),
-            vm["bt2-idx"].as<string>(), vm["em_filtering"].as<string>());
+            vm["bt2-idx"].as<string>(), vm["emfilter"].as<string>());
 
     SNVIdentifier snvId(gsa, 
                          vm["output_path"].as<string>(),
                          vm["output_basename"].as<string>(),
                          vm["min_phred"].as<int>()+BASE33_CONVERSION,
-                         vm["gsa1_mct"].as<int>(),
-                         vm["gsa2_mct"].as<int>(),
+                         vm["primary_mss"].as<int>(),
+                         vm["auxiliary_mss"].as<int>(),
                          vm["expected_coverage"].as<int>()*CALIB,
                          vm["n_threads"].as<int>(),
-                         vm["max_low_confidence_positions"].as<int>(),
+                         vm["max_SNPs"].as<int>(),
                          vm["expected_contamination"].as<double>(),
                          vm["max_allele_freq_of_error"].as<double>());
 

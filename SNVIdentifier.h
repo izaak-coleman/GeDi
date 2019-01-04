@@ -136,23 +136,23 @@ private:
   // Read characters with a phred score < MIN_PHRED_QUAL will not contribute to 
   // the consensus sequence.
 
-  const int GSA1_MCT;
+  const int PRI_MSS;
   // Blocks of suffixes covering the same genomic location in the coloured GSA,
-  // that are mostly cancer reads with a cancer read coverage of < GSA1_MCT
+  // that are mostly cancer reads with a cancer read coverage of < PRI_MSS
   // are not extracted.
 
-  int GSA2_MCT;
+  int AUX_MSS;
   // Blocks of suffixes covering the same genomic location in the second GSA
-  // that have a read coverage of < GSA2_MCT are not extracted.
-  // Consensus sequence positions generated from < GSA2_MCT reads are
-  // masked. Tumour consensus sequence positions with < GSA2_MCT reads
+  // that have a read coverage of < AUX_MSS are not extracted.
+  // Consensus sequence positions generated from < AUX_MSS reads are
+  // masked. Tumour consensus sequence positions with < AUX_MSS reads
   // supporting the chosen consensus base are masked.
 
   const int COVERAGE_UPPER_THRESHOLD;
   // Blocks with a coverage > COVERAGE_UPPER_THRESHOLD are discarded.
   int N_THREADS;
-  const int MAX_LOW_CONFIDENCE_POS;
-  // Blocks with > MAX_LOW_CONFIDENCE_POS number of low confidence postions
+  const int MAX_SNPS;
+  // Blocks with > MAX_SNPS number of low confidence postions
   // are discarded.
   const double ECONT;
   const double ALLELIC_FREQ_OF_ERROR;
@@ -283,7 +283,7 @@ private:
 
   bool excessLowQuality(consensus_pair & pair);
   // Returns true if number of low quality positions is >
-  // MAX_LOW_CONFIDENCE_POS, false otherwise.
+  // MAX_SNPS, false otherwise.
 
   int computeLCP(read_tag const& a, read_tag const& b);
   // Computes the lcp between two read_tag suffixes, returning the lcp

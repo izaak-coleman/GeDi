@@ -42,20 +42,20 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
                                      char mpq, int g1, int g2, int cut,
                                      int t, int mlcp, double e, double a):
                                      MIN_PHRED_QUAL(mpq), 
-                                     GSA1_MCT(g1), 
-                                     GSA2_MCT(g2), 
+                                     PRI_MSS(g1), 
+                                     AUX_MSS(g2), 
                                      COVERAGE_UPPER_THRESHOLD(cut),
                                      N_THREADS(t),
-                                     MAX_LOW_CONFIDENCE_POS(mlcp),
+                                     MAX_SNPS(mlcp),
                                      ECONT(e), 
                                      ALLELIC_FREQ_OF_ERROR(a) {
-  if (GSA1_MCT > GSA2_MCT) GSA2_MCT = GSA1_MCT;
+  if (PRI_MSS > AUX_MSS) AUX_MSS = PRI_MSS;
   if (outpath[outpath.size()-1] != '/') outpath += "/";
   gsa = &_gsa;    
   cout << "n_threads" << N_THREADS << endl;
   cout << "READ_LENGTH: " << gsa->get_max_read_len() << endl;
-  cout << "GSA1_MCT : " << GSA1_MCT  << endl;
-  cout << "GSA2_MCT: " << GSA2_MCT << endl;
+  cout << "PRI_MSS : " << PRI_MSS  << endl;
+  cout << "AUX_MSS: " << AUX_MSS << endl;
   cout << "UBT: " << COVERAGE_UPPER_THRESHOLD << endl;
   cout << "ALLELIC_FREQ_OF_ERROR: " << ALLELIC_FREQ_OF_ERROR << endl;
   cout << MIN_PHRED_QUAL << endl;
@@ -338,7 +338,7 @@ bool SNVIdentifier::excessLowQuality(consensus_pair & pair) {
   for (int i = 0; i < pair.non_mutated.size(); i++) {
     numLowQuality += (pair.nqual[i] == 'L' || pair.nqual[i] == 'B');
   }
-  if (numLowQuality > MAX_LOW_CONFIDENCE_POS) return true;
+  if (numLowQuality > MAX_SNPS) return true;
   return false;
 }
 
@@ -521,7 +521,7 @@ void SNVIdentifier::generateConsensusSequence(bool tissue,
     // Mask position if there is < GSA_MCT2 reads contributing to consensus
     int nreads=0;
     for (int base=0; base < 4; base++) nreads += cnsCount[pos*4 + base];
-    if (nreads < GSA2_MCT) {
+    if (nreads < AUX_MSS) {
       if (tissue == TUMOUR) {
         q_str[pos] = 'X';
       }
@@ -568,7 +568,7 @@ void SNVIdentifier::buildQualityString(string & qual, vector<int> const& freq_ma
         case 'C': base = 2; break;
         case 'G': base = 3; break;
       }
-      if (freq_matrix[pos*4 + base] < GSA2_MCT) {
+      if (freq_matrix[pos*4 + base] < AUX_MSS) {
         qual[pos] = 'C';
         continue;
       }
@@ -662,10 +662,10 @@ void SNVIdentifier::extractionWorker(int64_t seed_index, int64_t to, set<int64_t
     // Group size == 1 and group sizes of 1 permitted and groups is cancer read
     //cout << h_reads/c_reads << endl;
 
-    if (extension - seed_index == 1 && GSA1_MCT   == 1 && gsa->tissuetype(seed_index) == TUMOUR) {
+    if (extension - seed_index == 1 && PRI_MSS   == 1 && gsa->tissuetype(seed_index) == TUMOUR) {
       threadExtr.insert(gsa->read_id_of_suffix(gsa->sa_element(seed_index)));           // extract read
     }
-    else if (c_reads >= GSA1_MCT  && (h_reads / (c_reads + h_reads)) <= ECONT)  {
+    else if (c_reads >= PRI_MSS  && (h_reads / (c_reads + h_reads)) <= ECONT)  {
      // cout << "Inserted" << endl;
       for (int64_t i = seed_index; i < extension; i++) {
         if (gsa->tissuetype(gsa->sa_element(i)) == TUMOUR) {
@@ -683,7 +683,7 @@ void SNVIdentifier::extractionWorker(int64_t seed_index, int64_t to, set<int64_t
   // end.  Therefore, if the case condition is true, we need to check
   // it separately.
   if (seed_index == gsa->size() -1) {
-    if (GSA1_MCT  == 1 && gsa->tissuetype(gsa->sa_element(seed_index)) == TUMOUR) {
+    if (PRI_MSS  == 1 && gsa->tissuetype(gsa->sa_element(seed_index)) == TUMOUR) {
       threadExtr.insert(gsa->read_id_of_suffix(gsa->sa_element(seed_index)));
     }
   }
@@ -766,7 +766,7 @@ void SNVIdentifier::buildVariantBlocks(int64_t const * dSA, int64_t const
 
       if (ext == (dSA + dSA_sz)) break;
     }
-    if (ext - seed_idx >= GSA2_MCT) {
+    if (ext - seed_idx >= AUX_MSS) {
       // Then load into a variant block
       shared_ptr<bpBlock> block(new bpBlock);
       for (int64_t * it = seed_idx; it < ext; ++it) {
@@ -777,7 +777,7 @@ void SNVIdentifier::buildVariantBlocks(int64_t const * dSA, int64_t const
     }
     seed_idx = ext++;
   }
-  if (seed_idx == (dSA + dSA_sz - 1) && GSA2_MCT == 1) {
+  if (seed_idx == (dSA + dSA_sz - 1) && AUX_MSS == 1) {
     shared_ptr<bpBlock> block;
     block.reset(new bpBlock);
     block->insert(constructReadTag(dSA, dSA_sz, bsa, concat, (dSA + dSA_sz -1)));
@@ -942,14 +942,14 @@ void SNVIdentifier::extractBlocksWorker(int64_t seedIndex,
       extension++;
       if (extension == aux_gsa.size()) break;
     }
-    if (extension - seedIndex >= GSA2_MCT) {
+    if (extension - seedIndex >= AUX_MSS) {
       block.reset(new bpBlock);
       for (int64_t i = seedIndex; i < extension; i++) block->insert(aux_gsa[i]);
       localThreadStore.push_back(block);
     } 
     seedIndex = extension++;
   }
-  if (seedIndex == aux_gsa.size() - 1 && GSA2_MCT == 1) {
+  if (seedIndex == aux_gsa.size() - 1 && AUX_MSS == 1) {
     shared_ptr<bpBlock> block;
     block.reset(new bpBlock);
     block->insert(aux_gsa[seedIndex]);
@@ -1236,7 +1236,7 @@ void SNVIdentifier::unifyBlocks(vector<bpBlock> & seedBlocks) {
 
   for (blockMergeStatus const& status : mTable) {
     if (!status.merged) { // blocks that never merged were merged to
-      if (seedBlocks[status.id].size() < GSA2_MCT) continue;
+      if (seedBlocks[status.id].size() < AUX_MSS) continue;
       BreakPointBlocks.push_back(seedBlocks[status.id]);
     }
   }
@@ -1415,7 +1415,7 @@ string BreakPointBlocks::buildQualityString(vector< vector<int> > const& freq_ma
         case 'C': base = 2; break;
         case 'G': base = 3; break;
       }
-      if (freq_matrix[base][pos + m_start] < GSA2_MCT) {
+      if (freq_matrix[base][pos + m_start] < AUX_MSS) {
         q_str += "L";
         continue;
       }
@@ -1510,7 +1510,7 @@ void BreakPointBlocks::extractionWorker(unsigned int seed_index,
       }
 
       // check below econt
-      if (cancer_sequences >= GSA1_MCT   && 
+      if (cancer_sequences >= PRI_MSS   && 
          ((healthy_sequences / cancer_sequences) <= econt )) { // permit group
         for (unsigned int i = seed_index; i < extension; i++) {
           if(SA->getElem(i).type == TUMOUR) {     // only extr. cancer reads
@@ -1633,7 +1633,7 @@ void BreakPointBlocks::maskLowQualityPositions(consensus_pair & pair, bool &
       low_quality_count++;
     }
   }
-  if (low_quality_count > MAX_LOW_CONFIDENCE_POS) low_quality = true;
+  if (low_quality_count > MAX_SNPS) low_quality = true;
 }
 char BreakPointBlocks::revCompCharacter(char ch, bool rc) {
   if (!rc) return ch;
@@ -1664,7 +1664,7 @@ char BreakPointBlocks::revCompCharacter(char ch, bool rc) {
 //      if (extension == gsa.size()) break;
 //    }
 //    // Make alloc if group at or above CTR
-//    if (extension - seed_index >= GSA2_MCT) {
+//    if (extension - seed_index >= AUX_MSS) {
 //      for (int i=seed_index; i < extension; i++) block.block.insert(gsa[i]); 
 //    }
 //    else {    // continue, discarding group
@@ -1680,7 +1680,7 @@ char BreakPointBlocks::revCompCharacter(char ch, bool rc) {
 //    seed_index = extension++;
 //  }
 //
-//  if (seed_index == gsa.size() - 1 && GSA2_MCT == 1) {
+//  if (seed_index == gsa.size() - 1 && AUX_MSS == 1) {
 //    bpBlock block;
 //    block.block.insert(gsa[seed_index]);
 //    block.id = block_id;
@@ -2002,13 +2002,13 @@ bool BreakPointBlocks::generateConsensusSequence(unsigned int block_idx,
   for (int pos=0; pos < align_counter[0].size(); pos++) {
 
     // only start when the number of reads aligned at that position
-    /// is >= GSA2_MCT 
+    /// is >= AUX_MSS 
 
     int nreads=0;
     for (int base=0; base < 4; base++) {
       nreads += align_counter[base][pos];
     }
-    if (nreads < GSA2_MCT) {
+    if (nreads < AUX_MSS) {
       if (!hit_consensus_min) {
         n_skipped_start_pos++;		// need to nibble off skipped positions from cns offset
       }
