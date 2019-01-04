@@ -421,7 +421,7 @@ void SNVIdentifier::extractNonMutatedAlleles(bpBlock &block,
   }
 }
 char SNVIdentifier::rc(char c, int dir) {
-  if (dir == 1) {
+  if (dir == true) {
     return c;
   }
   switch (c) {
@@ -543,7 +543,7 @@ int SNVIdentifier::assignBaseDisregardingPhred(int const pos, vector<read_tag> c
     if (r.orientation == LEFT) {
       idx = gsa->len(r.read_id) - idx - 2;
     }
-    if (idx < 0 || idx > gsa->len(r.read_id)-1) continue;
+    if (idx < 0 || idx > gsa->len(r.read_id)-2) continue;
     string::const_iterator p = gsa->suffix_at(r.read_id) +  idx;
     ++c[a.find(rc(*p, (r.orientation == RIGHT)))];
   }
@@ -575,6 +575,7 @@ void SNVIdentifier::buildQualityString(string & qual, vector<int> const& freq_ma
     }
     double total_bases = 0;
     for (int base = 0; base < 4; base++) total_bases += freq_matrix[pos*4 + base];
+
     int n_bases_above_err_freq{0};
     for(int base = 0; base < 4; base++) {
       if ((freq_matrix[pos*4 + base] / total_bases) > ALLELIC_FREQ_OF_ERROR) {

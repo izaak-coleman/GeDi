@@ -2,7 +2,7 @@ OBJ=main.o util_funcs.o SNVIdentifier.o gsa.o GenomeMapper.o SamEntry.o CigarPar
 LINKDIVSUF=-Wl,-R libdivsufsort-master/build/lib/  -L libdivsufsort-master/build/lib/ -ldivsufsort64
 INCDIVSUF=-I libdivsufsort-master/build/include -ldivsufsort64
 EXE=GeDi
-COMPFLAGS=-MMD -fopenmp -std=c++11 -O3 -rdynamic
+COMPFLAGS=-MMD -fopenmp -std=c++17 -O3 -rdynamic
 CXX=g++
 
 $(EXE):$(OBJ)

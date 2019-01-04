@@ -93,7 +93,7 @@ GSA::GSA(string const& header_fname, int t, string const & ref, string const & e
 void GSA::em_filter(string const & ref, string const & f) {
   // run bowtie2
   cout << "Calling bowtie to align" << f << endl;
-  string command_aln("~/GeDi/bowtie2-2.3.1/bowtie2 -p 16 -x " + ref + " -U "
+  string command_aln("~/GeDi/bowtie2-2.3.4/bowtie2 -p 16 -x " + ref + " -U "
       + f + " -S " + f + ".sam");
   system(command_aln.c_str());
   cout << "finished bowtie call" << endl;
