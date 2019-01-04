@@ -50,6 +50,10 @@ private:
   int64_t bubbleRemove(int64_t * const a, int64_t const sz, int64_t const invalid);
   void em_filter(std::string const & ref, std::string const & f);
 
+  void reportFilesDataset(std::vector<std::string> const & file_list, 
+                          bool const tissue);
+  // Reports to stdout whether a files was loaded as tumour or control data
+
 public:
   GSA(std::string const & header_fname, int t, std::string const & ref, std::string const & em_filtering); // inits all class members
   ~GSA(); // free sa

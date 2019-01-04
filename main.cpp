@@ -5,6 +5,7 @@ Author: Izaak Coleman
 
 
 #include <iostream>
+#include <iomanip>
 #include <vector>
 #include <string>
 #include "boost/program_options.hpp"
@@ -17,6 +18,7 @@ Author: Izaak Coleman
 // benchmarking
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <chrono>
 // testing
 #include <typeinfo>
 
@@ -271,11 +273,11 @@ int main(int argc, char** argv)
     } 
 
     // Run GeDi
-    INITRSS(GeDi);
-    START(GeDi);
+    struct rusage gedi_rss; getrusage(RUSAGE_SELF, &gedi_rss);
+    auto gedi_runtime_start = std::chrono::steady_clock::now();
+    cout << "Running GeDi with " << vm["n_threads"].as<int>() << " threads." << endl;
     GSA gsa(vm["input_files"].as<string>(), vm["n_threads"].as<int>(),
             vm["bt2-idx"].as<string>(), vm["emfilter"].as<string>());
-
     SNVIdentifier snvId(gsa, 
                          vm["output_dir"].as<string>(),
                          vm["output_basename"].as<string>(),
@@ -294,8 +296,18 @@ int main(int argc, char** argv)
                         vm["chromosome"].as<string>(),
                         vm["bt2-idx"].as<string>(),
                         vm["min_mapq"].as<int>());
-    COMP(GeDi);
-    PRINTRSS(GeDi);
+    auto gedi_runtime_end = std::chrono::steady_clock::now();
+    double gedi_runtime =
+      std::chrono::duration_cast<std::chrono::milliseconds>(gedi_runtime_end -
+          gedi_runtime_start).count();
+    gedi_runtime = gedi_runtime / 60000; // minutes
+    getrusage(RUSAGE_SELF, &gedi_rss);
+    cout << std::fixed;
+    cout << std::setprecision(2);
+    cout << endl << endl;
+    cout << "GeDi terminated successfully." << endl
+         << "Runtime (mins): " << gedi_runtime << endl
+         << "Memory usage (bytes) : " << gedi_rss.ru_maxrss << endl;
     return SUCCESS;
   } 
   catch(std::exception& e) 

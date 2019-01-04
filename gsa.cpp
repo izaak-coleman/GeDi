@@ -57,48 +57,53 @@ GSA::GSA(string const& header_fname, int t, string const & ref, string const & e
   sa = nullptr;
   vector<string> h_fnames, t_fnames;
   read_header(header_fname, h_fnames, t_fnames);
+  reportFilesDataset(h_fnames, HEALTHY);
+  reportFilesDataset(t_fnames, TUMOUR);
+  cout << endl << endl;
+  cout << "Preprocessing." << endl;
   for (string const & f : h_fnames) {
-    cout << f << endl;
     load_fq_data(f);
   }
   tsi = concat.size();
   if (em_filtering != ON) {
     for (string const & f : t_fnames) {
-      cout << f << endl;
       load_fq_data(f);
     }
   }
   else {
+    cout << "Running emfilter on: " << endl;
     for (string const & f : t_fnames) {
-      cout << f << endl;
+      cout << " - " + f + " ..." << endl;
       em_filter(ref, f);
     }
   }
-  cout << "CONCAT: " << concat.size() << endl;
-  cout << "TSI: "  << tsi << endl;
   sa = (int64_t*) std::malloc(concat.size()*sizeof(int64_t));
   if (sa == nullptr) {
     cout << "Memory for suffix array allocation not available. Program terminating" << endl;
     exit(1);
   }
+  cout << endl << endl << "SNV detection." << endl;
+  cout << "Constructing primary suffix array..." << endl;
   sa_sz = concat.size();
-  START(p_gsa);
   divsufsort64((uint8_t*)const_cast<char*>(concat.c_str()), sa, sa_sz);
-  COMP(p_gsa);
-  START(rem_short_suf);
   remove_short_suffixes(MIN_SUF_LEN);
-  COMP(rem_short_suf);
+}
+
+void GSA::reportFilesDataset(vector<string> const & file_list, bool const tissue) {
+  // Reports whether a fastq was loaded as tumour or control data.
+  string type = (tissue == HEALTHY) ? "CONTROL" : "TUMOUR";
+  for (string const & f : file_list) {
+    cout << type + ": " + f << endl;
+  }
 }
 
 void GSA::em_filter(string const & ref, string const & f) {
   // run bowtie2
-  cout << "Calling bowtie to align" << f << endl;
+  cout << "Bowtie2 output: " << endl;
   string command_aln("~/GeDi/bowtie2-2.3.4/bowtie2 -p 16 -x " + ref + " -U "
       + f + " -S " + f + ".sam");
   system(command_aln.c_str());
-  cout << "finished bowtie call" << endl;
   string sf = f + ".sam";
-  cout << sf << endl;
   ifstream sam(sf.c_str()); // attach stream to samfile
 
   for (string line; getline(sam,line);) {
@@ -200,9 +205,6 @@ void GSA::read_header(string const& header_fname,
            << endl << "Program terminating." << endl;
       exit(1);
     }
-    cout << fields[0] << " input as " 
-         << ((fields[1] == HEALTHY_DATA) ? "healthy" : "tumour") << " data "
-         << endl;
   }
   fin.close();
 }

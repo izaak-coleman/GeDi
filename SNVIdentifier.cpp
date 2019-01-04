@@ -33,6 +33,7 @@ Author: Izaak Coleman
 using namespace std;
 
 const char TERM = '$';
+const int BASE33_CONVERSION = 33;
 
 
 
@@ -52,28 +53,19 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
   if (PRI_MSS > AUX_MSS) AUX_MSS = PRI_MSS;
   if (outpath[outpath.size()-1] != '/') outpath += "/";
   gsa = &_gsa;    
-  cout << "n_threads" << N_THREADS << endl;
-  cout << "READ_LENGTH: " << gsa->get_max_read_len() << endl;
-  cout << "PRI_MSS : " << PRI_MSS  << endl;
-  cout << "AUX_MSS: " << AUX_MSS << endl;
-  cout << "UBT: " << COVERAGE_UPPER_THRESHOLD << endl;
-  cout << "ALLELIC_FREQ_OF_ERROR: " << ALLELIC_FREQ_OF_ERROR << endl;
-  cout << MIN_PHRED_QUAL << endl;
-  cout << "Extracting cancer-specific reads..." << endl;
-  START(extractCancerSp);
+  cout << "Extracting reads from tumour-suffix enriched sections: pMSS = "
+       << PRI_MSS << endl;
   extractCancerSpecificReads(); 
-  COMP(extractCancerSp);
-  cout << "No of extracted reads: " << CancerExtraction.size() << endl;
-  // Group blocks covering same mutations in both orientations
-  cout << "Seeding breakpoint blocks by constructing GSA2..." << endl;
-  START(seedBreakPointBlocks);
-  seedBreakPointBlocks();
-  COMP(seedBreakPointBlocks);
-  CancerExtraction.clear();
-  cout << "Number of seed blocks: " << SeedBlocks.size() << endl;
-  cout << "<<<<<<<<<<<<<<building consensus pairs " << endl;
 
-  START(CNS_construction);
+  cout << "Constructing auxiliary suffix array..." << endl;
+  seedBreakPointBlocks();
+  CancerExtraction.clear();
+  cout << "Number of variant blocks extracted: " << SeedBlocks.size() 
+       << endl;
+
+  cout << endl << endl << "Consensus pair construction and filtering." << endl;
+  cout << "Minimum phred score of included bases = " 
+       << ((int) MIN_PHRED_QUAL) - BASE33_CONVERSION << endl;
   int64_t elementsPerThread;
   int n_threads;
   if (SeedBlocks.size() < N_THREADS) {
@@ -103,16 +95,11 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
       consensus_pairs.insert(consensus_pairs.end(), threadWork.begin(), threadWork.end());
     }
   }
-  COMP(CNS_construction);
-  // pop the consensus_pair elements, and for each pop, add an element to
-  // tumour_cns and fastq_string. 
+  cout << "Number of filtered consensus pairs: " << consensus_pairs.size() << endl;
+
   string fastq_data;
   buildFastqAndTumourCNSData(consensus_pairs, fastq_data);
-
-  cout << "<<<<<<<<<<<<<<Finished break point block construction" << endl;
-  cout << "Writing consensus pairs as fastq" << endl;
   writeConsensusPairs(fastq_data, outpath + basename + ".fastq.gz");
-
 }
 
 void SNVIdentifier::buildFastqAndTumourCNSData(std::list<consensus_pair> & consensus_pairs, string & fastq) {
@@ -699,7 +686,6 @@ void SNVIdentifier::seedBreakPointBlocks() {
   concat += reverseComplementString(gsa->get_suffix_string(*it));
   concat += '#';
 
-  cout << "Cancer Extraction size: " <<  CancerExtraction.size() << endl;
   int64_t concat_idx = 0;
   it++;
   for (; it != CancerExtraction.end(); it++) {
@@ -710,19 +696,17 @@ void SNVIdentifier::seedBreakPointBlocks() {
     bsa.push_back(pair<int64_t, int64_t>(*it, concat_idx));
   }
 
-  cout << "Building cancer specific sa" << endl;
   int64_t dSA_sz = concat.size();
   int64_t * dSA = (int64_t*) std::malloc(dSA_sz*sizeof(int64_t));
   divsufsort64((uint8_t*)const_cast<char*>(concat.c_str()), dSA,(int64_t)dSA_sz);
-  cout << "Size of dSA before removes_short_suffixes: " << dSA_sz << endl;
 
   // void function changes both dSA and dSA_sz
   remove_short_suffixes(dSA, dSA_sz, gsa->get_min_suf_size(), concat);
-  cout << "Size of dSA after removes_short_suffixes: " << dSA_sz << endl;
 
   omp_set_num_threads(N_THREADS);
   int64_t elementsPerThread = dSA_sz / N_THREADS;
   set<shared_ptr<bpBlock>, vBlockComp> result;
+  cout << "Extracting variant blocks: aMSS = " << AUX_MSS << endl;
 #pragma omp parallel for ordered
   for (int i = 0; i < N_THREADS; i++) {
     int64_t * from = (dSA + i*elementsPerThread);
@@ -736,12 +720,12 @@ void SNVIdentifier::seedBreakPointBlocks() {
     set<shared_ptr<bpBlock> , vBlockComp> twork;
     buildVariantBlocks(dSA, dSA_sz, from, to, bsa, concat, twork);
 #pragma omp ordered
-  //  SeedBlocks.insert(SeedBlocks.end(), twork.begin(), twork.end());
+  if (omp_get_thread_num() == 0) {
+    cout << "Removing redundant variant blocks" << endl;
+  }
     result.insert(twork.begin(), twork.end());
   }
-  START(seed_b_ins);
   SeedBlocks.insert(SeedBlocks.end(), result.begin(), result.end());
-  COMP(seed_b_ins);
   std::free(dSA);
 }
 

@@ -37,35 +37,27 @@ GenomeMapper::GenomeMapper(SNVIdentifier &snv,
                            MIN_MAPQ(min_mapq),
                            CHR(chr) {
 //START(GenomeMapper_GenomeMapper);        
+  cout << endl << endl << "SNV calling." << endl;
   this->snvId = &snv;
   if (outpath[outpath.size()-1] != '/') outpath += "/";
   string fastqName(outpath + basename + ".fastq.gz"),
          samName(outpath + basename + ".sam"),
          outName(outpath + basename + ".SNV_results");
 
-  cout << "Aligning consensus pairs with Bowtie2" << endl;
+  cout << "Aligning control consensus sequences as proxy..." << endl;
+  cout << "Bowtie2 output:" << endl;
   string command_aln("~/GeDi/bowtie2-2.3.4/bowtie2 -p 16 -x " + bwt_idx + " -U "
       + fastqName + " -S " + samName);
   system(command_aln.c_str());
   vector<SamEntry*> alignments;
-  cout << "Parsing sam" << endl;
-
-  struct rusage rss;
 
   parseSamFile(alignments, samName);
-  getrusage(RUSAGE_SELF, &rss);
-
-  cout << "Identifying SNV" << endl;
+  cout << "Calculating SNV locations..." << endl;
   identifySNVs(alignments);
   snvId->tumour_cns.clear();
-
-  getrusage(RUSAGE_SELF, &rss);
-  cout << "RSS after identifyingSNVs()" << rss.ru_maxrss << endl;
-
+  
+  cout << "Calling..." << endl;
   outputSNVToUser(alignments, outName);
-  getrusage(RUSAGE_SELF, &rss);
-  cout << "RSS after outputSNVToUser()" << rss.ru_maxrss << endl;
-//COMP(GenomeMapper_GenomeMapper);  
 }
 
 void GenomeMapper::parseSamFile(vector<SamEntry*> &alignments, string filename) {
