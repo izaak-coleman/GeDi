@@ -8,6 +8,8 @@ Author: Izaak Coleman
 #include <vector>
 #include <string>
 #include "boost/program_options.hpp"
+#include "boost/exception/diagnostic_information.hpp"
+#include "boost/exception_ptr.hpp"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -121,7 +123,7 @@ int main(int argc, char** argv)
  
     po::variables_map vm; 
     try { 
-      po::store(po::parse_command_line(argc, argv, desc),vm); // can throw 
+      po::store(po::parse_command_line(argc, argv, desc),vm); 
       if (vm.count("help")) { 
         cout.precision(1);
         std::cout << "***********************************************************************" << std::endl
@@ -225,9 +227,9 @@ int main(int argc, char** argv)
       }
 
       struct stat info_p, info_i;
-      if (stat(vm["output_path"].as<string>().c_str(), &info_p) != 0) {
+      if (stat(vm["output_dir"].as<string>().c_str(), &info_p) != 0) {
         std::cerr << "ERROR: "
-                  << "Cannot access " << vm["output_path"].as<string>()
+                  << "Cannot access " << vm["output_dir"].as<string>()
                   << std::endl << "Please check path is correct."
                   << std::endl
                   << "Program terminating." << std::endl;
@@ -235,7 +237,7 @@ int main(int argc, char** argv)
       }
       else if (!(info_p.st_mode & S_IFDIR)) {
         std::cerr << "ERROR: "
-                  << vm["output_path"].as<string>() 
+                  << vm["output_dir"].as<string>() 
                   << " cannot be found. Please check directory exists."
                   << std::endl << "before running GeDi." 
                   << std::endl
@@ -275,7 +277,7 @@ int main(int argc, char** argv)
             vm["bt2-idx"].as<string>(), vm["emfilter"].as<string>());
 
     SNVIdentifier snvId(gsa, 
-                         vm["output_path"].as<string>(),
+                         vm["output_dir"].as<string>(),
                          vm["output_basename"].as<string>(),
                          vm["min_phred"].as<int>()+BASE33_CONVERSION,
                          vm["primary_mss"].as<int>(),
@@ -287,7 +289,7 @@ int main(int argc, char** argv)
                          vm["max_allele_freq_of_error"].as<double>());
 
     GenomeMapper mapper(snvId, 
-                        vm["output_path"].as<string>(),
+                        vm["output_dir"].as<string>(),
                         vm["output_basename"].as<string>(),
                         vm["chromosome"].as<string>(),
                         vm["bt2-idx"].as<string>(),
