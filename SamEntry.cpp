@@ -8,7 +8,6 @@ Author: Izaak Coleman
 #include <vector>
 #include "util_funcs.h"
 #include "SamEntry.h"
-#include "benchmark.h"
 
 using namespace std;
 
@@ -55,33 +54,4 @@ SamEntry::SamEntry(string const& entry, vector<string> const & tumour_cns) {
   rnext = fields[SamEntry::RNEXT]; 
   seq   = fields[SamEntry::SEQ]; 
   qual  = fields[SamEntry::QUAL]; 
-
 }
-
-
-bool SamEntry::containsIndel() {
-  if (cigar.find('i') || cigar.find('d')) {
-    return true;
-  }
-  return false;
-}
-
-void SamEntry::free() {
-  del = true;
-  SNVLocations.clear();
-  t_cns.clear();
-  rname.clear();
-  cigar.clear();
-  rnext.clear();
-  seq.clear();
-  qual.clear();
-}
-
-bool SamEntry::deleted() {
-  return del;
-}
-
-bool SamEntry::indel() {
-  return (cigar.find('D') != string::npos) || (cigar.find('I') != string::npos);
-}
-

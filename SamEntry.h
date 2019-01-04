@@ -10,8 +10,6 @@ Author: Izaak Coleman
 #include <iostream>
 #include <vector>
 #include <string>
-#include <map>
-#include <boost/any.hpp>
 
 class SamEntry {
 public:
@@ -70,18 +68,6 @@ public:
 
   SamEntry(std::string const& line, std::vector<std::string> const & tumour_cns); 
   // Separates fields, discards any non compulsory fields. 
-
-  bool containsIndel(); 
-  // returns true if CIGAR string contains 'I' or 'D', false otherwise.
-
-  void free();
-  // frees memory allocated to string fields and SNVLocations
-
-  bool deleted();
-  // Returns true if free() was called on object, false otherwise
-
-  bool indel();
-  // Returns true of alignment contains indel relative to ref.
 
   void set(int k, int v) {
     switch (k) {

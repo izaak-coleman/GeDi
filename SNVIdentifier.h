@@ -38,16 +38,6 @@ struct read_tag_compare{
     // -- First sorted by tissue type TUMOUR = SWITCHED < HEALTHY
     // -- Then sorted by read_id
     return a.read_id < b.read_id;
-    //if( (a.tissue_type == TUMOUR || a.tissue_type == SWITCHED) &&
-    //    (b.tissue_type == TUMOUR || b.tissue_type == SWITCHED) ) {
-    //    return a.read_id < b.read_id;
-    //}
-    //else if (a.tissue_type == HEALTHY && b.tissue_type == HEALTHY) {
-    //    return a.read_id < b.read_id;
-    //}
-    //else {
-    //    return (a.tissue_type % 2) < (b.tissue_type % 2); // mod to keep SWITCHED and TUMOUR together
-    //}
   }
 };
 
@@ -65,67 +55,6 @@ struct vBlockComp{
       }
     }
     return false; // same reads in blocks
-  }
-};
-
-struct tumourRTCompare{
-  bool operator() (const read_tag &a, const read_tag &b) {
-    if (a.read_id != b.read_id) {
-      return a.read_id < b.read_id;
-    }
-    else {
-      return a.offset < b.offset;
-    }
-  }
-};
-
-struct bpBlockCompare{
-  bool operator() (std::shared_ptr<bpBlock const> const a, std::shared_ptr<bpBlock const>
-      const b) {
-    bpBlock::const_iterator a_it = a->cbegin();
-    bpBlock::const_iterator b_it = b->cbegin();
-    tumourRTCompare comp;
-    for(; a_it != a->cend() && b_it != b->cend(); a_it++, b_it++) {
-      if(comp(*a_it, *b_it)) { // a < b, return true
-        return true;
-      }
-      else if (comp(*b_it, *a_it)) { // b < a, return false
-        return false;
-      }
-      // else, continue
-    }
-    // same elements, compare sizes
-    if (a_it == a->cend() && b_it == b->cend()) { // a == b, return false
-      return false;
-    }
-    else if (a_it == a->cend()) { // a at end, b not, a < b, return true
-      return true;
-    }
-    else  { // b at end, a not, a < b is false, return false
-      return false;
-    }
-  }
-};
-
-struct equalTumourRT {
-  bool operator() (read_tag const& a, read_tag const& b) {
-    return a.read_id == b.read_id;
-  }
-};
-
-
-struct bpBlockEqual {
-  bool operator() (std::shared_ptr<bpBlock const> const a,
-      std::shared_ptr<bpBlock const> const b) {
-    // first check sizes
-    if (a->size() != b->size()) return false;
-    // check elems
-    equalTumourRT equal;
-    for(bpBlock::const_iterator a_it = a->cbegin(), b_it = b->cbegin();
-        a_it != a->cend(); a_it++, b_it++) {
-      if (!equal(*a_it,*b_it)) return false;
-    }
-    return true;
   }
 };
 
@@ -150,11 +79,15 @@ private:
 
   const int COVERAGE_UPPER_THRESHOLD;
   // Blocks with a coverage > COVERAGE_UPPER_THRESHOLD are discarded.
+
   int N_THREADS;
+
   const int MAX_SNPS;
   // Blocks with > MAX_SNPS number of low confidence postions
   // are discarded.
+
   const double ECONT;
+
   const double ALLELIC_FREQ_OF_ERROR;
   // Aligned positions with > 1 base with a frequency above
   // ALLELIC_FREQ_OF_ERROR are considered low confidence positions and masked.
@@ -162,17 +95,11 @@ private:
   std::set<int64_t> CancerExtraction;
   // Elements are indicies of cancer specific reads extracted from the
   // coloured GSA
+
   std::vector<std::shared_ptr<bpBlock> > SeedBlocks;
   // Elements are initial break point blocks, generated from 
   // seedBreakPointBlocks(), each block consists of the the cancer specific
   // reads covering single location.
-
-  std::vector<bpBlock> BreakPointBlocks;
-  // Fully formed break point blocks. Consisting of a set of cancer
-  // specific reads covering a potential mutation, and the corresponding
-  // healthy reads that cover the same location, along with the relative alignment
-  // information, used to align each read against its own block.
-
 
 
   int64_t backUpSearchStart(int64_t seed_index);
@@ -201,26 +128,7 @@ private:
   // transformed with transformBlock() into a second GSA chunk.
   // extractGroups() then generates seed blocks from second GSA.
 
-  void transformBlock(int64_t *from, int64_t *to,
-                      std::vector< std::pair<int64_t, int64_t> > *bsa,
-                      std::string const& concat,
-                      std::vector<read_tag> * block);
-  // Transforms a block of the suffix array elements into a block of the
-  // second GSA elements.
-  
-  void extractBlocks(std::vector<read_tag> const& gsa);
-  // Divides second GSA gsa into even chunks and deploys threads
-  // with each thread computing extractGroupsWorker() over an allocated chunk.
-
-  void extractBlocksWorker(int64_t seed_index, int64_t to,
-                           std::vector<read_tag> const* gsa_ptr,
-                           std::vector<std::shared_ptr<bpBlock> > & localThreadStore);
-  // Passes through the allocated second GSA chunk extracting sets
-  // of reads (seed break point blocks), represented by read_tag if:
-  // -- Suffixes of reads cover same genomic location
-  // -- Number of reads in seed break point block is > GSA_MCT2
-
-  void buildConsensusPairsWorker(std::shared_ptr<bpBlock> * block,
+  void buildConsensusPairs(std::shared_ptr<bpBlock> * block,
       std::shared_ptr<bpBlock> * end,
       std::vector<consensus_pair> & threadWork);
   // Builds consensus pairs out of an allocated group of seed break point
@@ -285,9 +193,6 @@ private:
   // Returns true if number of low quality positions is >
   // MAX_SNPS, false otherwise.
 
-  int computeLCP(read_tag const& a, read_tag const& b);
-  // Computes the lcp between two read_tag suffixes, returning the lcp
-
   int convertOffset(read_tag const& tag);
   // converts alignment offset between forward and reverse orientation,
   // returning the converted offset
@@ -317,8 +222,7 @@ private:
   // Returns true if pair.mutated and pair.non_mutated do not contain
   // a mismatch representative of an SNV. 
 
-  int64_t computeLCP(std::string::const_iterator a, std::string::const_iterator
-      b);
+  int64_t computeLCP(std::string::const_iterator a, std::string::const_iterator b);
 
   void buildVariantBlocks(int64_t const * dSA, int64_t const dSA_sz, int64_t * seed_idx, int64_t const
       * const to, std::vector< std::pair<int64_t, int64_t> > const & bsa, 
@@ -330,29 +234,26 @@ private:
       std::string const & concat, int64_t const * ptr);
 
   void xorSwap(int64_t *x, int64_t *y);
+
   int64_t bubbleRemove(int64_t * const a, int64_t const sz, int64_t const
       invalid);
-  int64_t suffixLen(int64_t const i, std::string const & concat);
+
   void remove_short_suffixes(int64_t* &sa, int64_t &sa_sz, int64_t
     min_suffix_length, std::string const & concat);
+
+  int64_t suffixLen(int64_t const i, std::string const & concat);
 
   int assignBaseDisregardingPhred(int const pos, std::vector<read_tag> const & block,
       int const max_offset);
 
-  
-  std::string readTagToString(read_tag const& tag);
+
   std::pair<int64_t, int64_t> binarySearch(std::vector< std::pair<int64_t,
       int64_t> > const & bsa, int64_t sa_pos);
 
   void buildFastqAndTumourCNSData(std::list<consensus_pair> & consensus_pairs, std::string & fastq);
 
-  void mergeBlocks(bpBlock & to, bpBlock & from);
-
-  void unifyBlocks(std::vector<bpBlock> & seedBlocks);
-
-  void printExtractedCancerReads();
-
   bool singleIndel(std::string const & cigar);
+
   bool containsIndel(std::string const & tumour, std::string const & control);
 
 public:
@@ -363,77 +264,11 @@ public:
                     int n_threads, int max_low_confidence_pos,
                     double econt, double allelic_freq_of_error);
 
-  int64_t getSize();
-  std::string addGaps(int ngaps);
-  // adds gaps preceeding a read to give aligned output.
   std::vector<std::string> tumour_cns;
 
+  // DEBUG
   void printAlignedBlock(bpBlock block);
-
+  void printExtractedCancerReads();
+  std::string addGaps(int ngaps);
 };
-
-
-
-
 #endif
-/*
-  bool generateConsensusSequence(unsigned int block_id, int &cns_offset, 
-      bool tissue_type, unsigned int &pair_id,
-      std::string &cns, std::string & qual);
-  long long int backUpToFirstMatch(long long int bs_hit, std::string query);
-  // binarySearch() will it a match, but it may not be the first match.
-  // Once binarySearch() finds the match, it calls backUpToFirstMatch()
-  // which finds the smallest indexed suffix that matches the query
-
-  void extractNonMutatedAlleles();
-  // Re-interrogate the suffix array, extracting healthy reads
-  // looping through each block and searching for each 30bp substring
-  // of each read
-  ~BreakPointBlocks();
-  // Destructor dealocates BPG
-
-  void outputExtractedCancerReads(std::string const& filename);
-  // Outputs (idx,type) tuples from CancerExtraction
-
-  void outputFromBPB(std::string const& filename);
-  void maskLowQualityPositions(consensus_pair & pair, bool & low_quality);
-  char revCompCharacter(char ch, bool rc);
-
-  std::string reverseComplementString(std::string s);
-  // returns the reverse complement of a string
-
-  void printAlignedBlocks();
-  void printAlignedBlock(bpBlock block);
-  void printBreakPointBlocks();
-  // Prints out each of the breakpoint groups, type and read index
-//  void printCancerExtractionGroups();
-// prints out the cancer extraction groups from the initial extractions
-
-//  Redundant functions 
-//
-//
-//  void extractNonMutatedAllelesDeep();
-//
-//  void unifyComplementaryGroups();
-//
-//
-//  void discardSingleOrientationBlocks();
-//  // After breakpoint blocks have been generated remove blocks that just
-//  // contain one orientation
-//
-//  bool thirtyBasePairOverlap(unsigned int lhs, unsigned int rhs);
-//  // check if two reads share a 30bp overlap
-//
-//bool sequenceMatch(std::string right, std::string left);
-//
-//  void unifyReverseComplementaryReads();
-//  // Function performs the final stage to initialze the breakpoint groups.
-//  // This function merges groups that cover the same mutation, 
-//  // but in different orientations
-  void makeBreakPointBlocks();
-  void invalidatePosition(std::vector< std::vector<int> > &alignment_counter, 
-      int pos);
-  // Where number of reads is < TRIM_VALUE this sets bases rows at the
-  // insufficient position to -1, invalidating the position, as
-  // the number of reads must be at least 0.
- */

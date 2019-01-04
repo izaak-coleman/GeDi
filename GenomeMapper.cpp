@@ -9,11 +9,7 @@ Author: Izaak Coleman
 #include <string>
 #include <fstream>
 #include <cstdlib>
-#include <boost/regex.hpp>
-
-// COMPUTE RSS
-#include <sys/time.h>
-#include <sys/resource.h>
+#include <algorithm>
 
 #include "GenomeMapper.h"
 #include "SNVIdentifier.h"
@@ -21,7 +17,6 @@ Author: Izaak Coleman
 #include "SamEntry.h"
 #include "SamEntryGet.h"
 #include "CigarParser.h"
-#include "benchmark.h"
 
 using namespace std;
 
@@ -36,7 +31,6 @@ GenomeMapper::GenomeMapper(SNVIdentifier &snv,
                            int min_mapq):
                            MIN_MAPQ(min_mapq),
                            CHR(chr) {
-//START(GenomeMapper_GenomeMapper);        
   cout << endl << endl << "SNV calling." << endl;
   this->snvId = &snv;
   if (outpath[outpath.size()-1] != '/') outpath += "/";
@@ -61,7 +55,6 @@ GenomeMapper::GenomeMapper(SNVIdentifier &snv,
 }
 
 void GenomeMapper::parseSamFile(vector<SamEntry*> &alignments, string filename) {
-//START(GenomeMapper_parseSamFile);
   ifstream snvSam(filename);
   string line;
   while(getline(snvSam, line)) {
@@ -80,12 +73,10 @@ void GenomeMapper::parseSamFile(vector<SamEntry*> &alignments, string filename) 
     alignments.push_back(entry);
   }
   snvSam.close();
-//COMP(GenomeMapper_parseSamFile);
 }
 
 
 void GenomeMapper::identifySNVs(vector<SamEntry*> &alignments) {
-//START(GenomeMapper_identifySNVs);
   for (SamEntry* &entry : alignments) {
     if(get<int>(SamEntry::FLAG, entry) == FORWARD_FLAG) {
       CigarParser cp(get<string>(SamEntry::CIGAR, entry));
@@ -97,7 +88,6 @@ void GenomeMapper::identifySNVs(vector<SamEntry*> &alignments) {
       countSNVs(entry, get<int>(SamEntry::RIGHT_OHANG, entry), cp); // invert overhangs due to rev comp
     }
   }
-//COMP(GenomeMapper_identifySNVs);
 }
 
 char GenomeMapper::operationOfSNV(int const SNVPos, CigarParser const & cp) {
@@ -159,7 +149,6 @@ bool GenomeMapper::contiguousMismatch(string const & mutated, string const & non
 
 void GenomeMapper::countSNVs(SamEntry * &alignment, int ohang, CigarParser const
     & cp) {
-//START(GenomeMapper_countSNVs);
   string mutated = get<string>(SamEntry::TCNS, alignment);
   string nonMutated = get<string>(SamEntry::SEQ, alignment);
   bool noSNVs = true;
@@ -202,7 +191,6 @@ void GenomeMapper::countSNVs(SamEntry * &alignment, int ohang, CigarParser const
     delete alignment;
     alignment = nullptr;
   }
-//COMP(GenomeMapper_countSNVs);
 }
 bool GenomeMapper::compareSNVLocations(const single_snv &a, const single_snv &b) {
   return a.position < b.position;
@@ -216,7 +204,6 @@ bool GenomeMapper::equalSNVs(single_snv const& a, single_snv const& b) {
 }
 
 void GenomeMapper::outputSNVToUser(vector<SamEntry*> &alignments, string outName) {
-//START(GenomeMapper_outputSNVToUser);
   vector<single_snv> separate_snvs;
   for(SamEntry* & entry : alignments) {
     if (entry == nullptr) {
@@ -251,7 +238,6 @@ void GenomeMapper::outputSNVToUser(vector<SamEntry*> &alignments, string outName
     i++;
   }
   report.close();
-//COMP(GenomeMapper_outputSNVToUser);
 }
 
 

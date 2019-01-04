@@ -9,23 +9,14 @@ Author: Izaak Coleman
 #include <vector>
 #include <string>
 #include "boost/program_options.hpp"
-#include "boost/exception/diagnostic_information.hpp"
-#include "boost/exception_ptr.hpp"
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
 // benchmarking
-#include <sys/time.h>
 #include <sys/resource.h>
 #include <chrono>
-// testing
-#include <typeinfo>
 
 #include "SNVIdentifier.h"
-#include "util_funcs.h"
 #include "GenomeMapper.h"
-#include "benchmark.h"
 #include "gsa.h"
 
 
