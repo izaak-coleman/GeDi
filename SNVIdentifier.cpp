@@ -34,7 +34,6 @@ const int BASE33_CONVERSION = 33;
 
 
 SNVIdentifier::SNVIdentifier(GSA &_gsa,
-                                     string outpath,
                                      string const & basename,
                                      char mpq, int g1, int g2, int cut,
                                      int t, int mlcp, double e, double a):
@@ -47,7 +46,6 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
                                      ECONT(e), 
                                      ALLELIC_FREQ_OF_ERROR(a) {
   if (PRI_MSS > AUX_MSS) AUX_MSS = PRI_MSS;
-  if (outpath[outpath.size()-1] != '/') outpath += "/";
   gsa = &_gsa;    
   cout << "Extracting reads from tumour-suffix enriched sections: pMSS = "
        << PRI_MSS << endl;
@@ -95,7 +93,7 @@ SNVIdentifier::SNVIdentifier(GSA &_gsa,
 
   string fastq_data;
   buildFastqAndTumourCNSData(consensus_pairs, fastq_data);
-  writeConsensusPairs(fastq_data, outpath + basename + ".fastq.gz");
+  writeConsensusPairs(fastq_data, basename + ".fastq.gz");
 }
 
 void SNVIdentifier::buildFastqAndTumourCNSData(std::list<consensus_pair> & consensus_pairs, string & fastq) {

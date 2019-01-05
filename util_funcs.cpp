@@ -12,6 +12,17 @@ Author: Izaak Coleman
 
 using namespace std;
 
+string get_dir_from_filename(string const & fname){
+  int end_of_path = fname.find_last_of('/');
+  if (end_of_path == string::npos) {
+    return "./";
+  }
+  else {
+    return fname.substr(0, end_of_path);
+  }
+}
+
+
 void split_string(string const & s, string const & tokens, vector<string> & split_strings) {
   char *c_s = const_cast<char*>(s.c_str());
   char *c_tokens = const_cast<char*>(tokens.c_str());

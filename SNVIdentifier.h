@@ -257,7 +257,7 @@ private:
   bool containsIndel(std::string const & tumour, std::string const & control);
 
 public:
-  SNVIdentifier(GSA & gsa, std::string outpath, 
+  SNVIdentifier(GSA & gsa,
                     std::string const& basename, 
                     char min_phred, int gsa1_mct, int gsa2_mct,
                     int coverage_upper_threshold,

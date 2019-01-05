@@ -12,6 +12,8 @@ Author: Izaak Coleman
 enum {TUMOUR, HEALTHY, SWITCHED}; // Data type
 enum {LEFT, RIGHT}; // Orientation in memory
 
+std::string get_dir_from_filename(std::string const & fname);
+
 void split_string(std::string const & s, std::string const & tokens, std::vector<std::string>
     & fields);
 // Splits string at token into fields

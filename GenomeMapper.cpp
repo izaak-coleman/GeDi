@@ -24,7 +24,6 @@ static const int REVERSE_FLAG = 16;
 static const int FORWARD_FLAG = 0;
 
 GenomeMapper::GenomeMapper(SNVIdentifier &snv, 
-                           string outpath,
                            string const& basename,
                            string const& chr,
                            string const& bwt_idx,
@@ -33,10 +32,9 @@ GenomeMapper::GenomeMapper(SNVIdentifier &snv,
                            CHR(chr) {
   cout << endl << endl << "SNV calling." << endl;
   this->snvId = &snv;
-  if (outpath[outpath.size()-1] != '/') outpath += "/";
-  string fastqName(outpath + basename + ".fastq.gz"),
-         samName(outpath + basename + ".sam"),
-         outName(outpath + basename + ".SNV_results");
+  string fastqName(basename + ".fastq.gz"),
+         samName(basename + ".sam"),
+         outName(basename + ".SNV_results");
 
   cout << "Aligning control consensus sequences as proxy..." << endl;
   cout << "Bowtie2 output:" << endl;

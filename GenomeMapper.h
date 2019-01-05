@@ -65,7 +65,7 @@ private:
 
 public:
     GenomeMapper(SNVIdentifier &snv,
-                 std::string outpath, std::string const& basename,
+                 std::string const& basename,
                  std::string const& chr, std::string const& bwt_idx,
                  int min_mapq);
 };

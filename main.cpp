@@ -85,10 +85,6 @@ int main(int argc, char** argv)
        "Proportion of cancer dataset expected to contain healthy-tissue " 
        "derived reads. Real number ranged [0,1].\n")
 
-      ("output_dir,p", po::value<string>()->default_value(OUTPUT_PATH), 
-       "path to output directory, where <output_prefix>.SNV_results, " 
-       "<output_prefix>.fastq.gz and <output_prefix>.sam will be written.\n")
-
       ("chromosome,c", po::value<string>()->default_value(CHR), 
        "For targeted sequencing data analysis. Only control consensus "  
        "consensus sequenceswith RNAME identical to the given value "  
@@ -220,9 +216,10 @@ int main(int argc, char** argv)
       }
 
       struct stat info_p, info_i;
-      if (stat(vm["output_dir"].as<string>().c_str(), &info_p) != 0) {
+      string output_dir = get_dir_from_filename(vm["output_basename"].as<string>());
+      if (stat(output_dir.c_str(), &info_p) != 0) {
         std::cerr << "ERROR: "
-                  << "Cannot access " << vm["output_dir"].as<string>()
+                  << "Cannot access " << output_dir
                   << std::endl << "Please check path is correct."
                   << std::endl
                   << "Program terminating." << std::endl;
@@ -270,7 +267,6 @@ int main(int argc, char** argv)
     GSA gsa(vm["input_files"].as<string>(), vm["n_threads"].as<int>(),
             vm["bt2-idx"].as<string>(), vm["emfilter"].as<string>());
     SNVIdentifier snvId(gsa, 
-                         vm["output_dir"].as<string>(),
                          vm["output_basename"].as<string>(),
                          vm["min_phred"].as<int>()+BASE33_CONVERSION,
                          vm["primary_mss"].as<int>(),
@@ -282,7 +278,6 @@ int main(int argc, char** argv)
                          vm["max_allele_freq_of_error"].as<double>());
 
     GenomeMapper mapper(snvId, 
-                        vm["output_dir"].as<string>(),
                         vm["output_basename"].as<string>(),
                         vm["chromosome"].as<string>(),
                         vm["bt2-idx"].as<string>(),
