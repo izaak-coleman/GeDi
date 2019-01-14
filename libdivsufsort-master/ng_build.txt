@@ -1,0 +1,4 @@
+INCDIVSUF=-I divsufsort64/include -ldivsufsort64 -L divsufsort64/lib/ -ldivsufsort64
+
+cmake -DCMAKE_BUILD_TYPE="Release" -DBUILD_DIVSUFSORT64="ON"
+-DBUILD_SHARED_LIBS="OFF" -DCMAKE_INSTALL_PREFIX=<your directory> ..
