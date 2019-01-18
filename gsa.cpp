@@ -16,6 +16,13 @@
 #include "divsufsort64.h"
 #include "util_funcs.h"
 
+#define STR(str) #str
+#define STRING(str) STR(str)
+
+#define STR(str) #str
+#define STRING(str) STR(str)
+
+
 KSEQ_INIT(gzFile, gzread);    // initialize .gz parser
 
 using namespace std;
@@ -89,7 +96,8 @@ void GSA::reportFilesDataset(vector<string> const & file_list, bool const tissue
 void GSA::em_filter(string const & ref, string const & f) {
   // run bowtie2
   cout << "Bowtie2 output: " << endl;
-  string command_aln("~/GeDi/bowtie2-2.3.4/bowtie2 -p 16 -x " + ref + " -U "
+  string pwd(STRING(PWD));
+  string command_aln(pwd + "/bowtie2-2.3.4/bowtie2 -p 16 -x " + ref + " -U "
       + f + " -S " + f + ".sam");
   system(command_aln.c_str());
   string sf = f + ".sam";

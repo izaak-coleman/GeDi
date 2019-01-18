@@ -18,6 +18,13 @@ Author: Izaak Coleman
 #include "SamEntryGet.h"
 #include "CigarParser.h"
 
+#define STR(str) #str
+#define STRING(str) STR(str)
+
+#define STR(str) #str
+#define STRING(str) STR(str)
+
+
 using namespace std;
 
 static const int REVERSE_FLAG = 16;
@@ -38,7 +45,8 @@ GenomeMapper::GenomeMapper(SNVIdentifier &snv,
 
   cout << "Aligning control consensus sequences as proxy..." << endl;
   cout << "Bowtie2 output:" << endl;
-  string command_aln("~/GeDi/bowtie2-2.3.4/bowtie2 -p 16 -x " + bwt_idx + " -U "
+  string pwd(STRING(PWD));
+  string command_aln(pwd + "/bowtie2-2.3.4/bowtie2 -p 16 -x " + bwt_idx + " -U "
       + fastqName + " -S " + samName);
   system(command_aln.c_str());
   vector<SamEntry*> alignments;
