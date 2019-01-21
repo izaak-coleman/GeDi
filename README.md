@@ -6,7 +6,7 @@ in tumour genomes.
 GeDi, or **Ge**neralised suffix array-based **Di**rect SNV caller,
 detects somatic Single Nucleotide Variants (SNVs) within paired tumour-control
 NGS datasets. GeDi is capable of detecting SNVs reference- and mapping-free.
-To acheive this, it compares the input sequencing data by
+To achieve this, it compares the input sequencing data by
 construction of multiple suffix arrays from which SNVs can be directly detected;
 within the arrays, suffixes containing SNVs cluster into intervals enriched with
 tumour-derived data.
@@ -23,14 +23,14 @@ the following on the command-line:
 git clone https://github.com/izaak-coleman/GeDi
 ```
 Move the directory named `GeDi` (source code directory) 
-into a location where you are comforable with it remaining; 
+into a location where you are comfortable with it remaining; 
 once GeDi is compiled, the source code directory cannot be moved 
 without re-compilation (see compilation section below).
 
 
 # Compilation
 To reduce the required dependencies for GeDi, we included many of the
-libaries GeDi requires within its source code directory, which is where
+libraries GeDi requires within its source code directory, which is where
 the GeDi executable will be built. As a consequence, once GeDi is compiled
 from within its source code directory, it cannot be moved without recompilation. 
 
@@ -43,18 +43,18 @@ remain to successfully compile GeDi.
   - boost program options library. On CentOS, install with `yum install
   boost-devel.x86_64`, on Ubuntu with `sudo apt-get install libboost-all-dev`.
   - A bowtie2 index of a reference genome. For example, `ucsc.hg19.fasta`
-    can be build by installing bowtie2 and issuing `bowtie2-build
+    can be build by installing bowtie2 and issuing command `bowtie2-build
     ucsc.hg19.fasta ucsc.hg19.fasta`, see [bowtie2 reference manual](http://bowtie-bio.sourceforge.net/bowtie2/manual.shtml)
     for further details.
 
-Once the depenendancies have been installed and GeDi's source code
-directory is placed in a prefered location, compile GeDi with the following:
+Once the dependancies have been installed and GeDi's source code
+directory is placed in a preferred location, compile GeDi with the following:
 ```
 cd GeDi
 bash install.sh
 ```
 Compilation of GeDi will now initiate. Once compilation is complete,
-test that GeDi compiled succesfully by executing
+test that GeDi compiled successfully by executing
 ```
 ./GeDi --help
 ```
@@ -137,7 +137,7 @@ parameters (each of which was specified in the above example):
         Note this argument passed to this parameter should be identical to the
         argument one would pass to `-x` if running bowtie2. See
         [bowtie2 reference manual](http://bowtie-bio.sourceforge.net/bowtie2/manual.shtml) 
-        for a further explaination of bowtie2's `-x` parameter.
+        for a further explanation of bowtie2's `-x` parameter.
  - `-o` prefix of the output files produced by GeDi. This can include a file
         path, and GeDi will write files with the prefix at the specified location.
 
