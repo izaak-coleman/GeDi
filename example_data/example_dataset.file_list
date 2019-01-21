@@ -1,0 +1,2 @@
+./example_data/example_control_data.fastq.gz,C
+./example_data/example_tumour_data.fastq.gz,T
