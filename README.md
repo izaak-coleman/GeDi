@@ -21,7 +21,6 @@ code and unzip the source code directory. For example:
 ```
 git clone https://github.com/izaak-coleman/GeDi
 ```
-
 Move the source code directory into a location where you are comforable with 
 it remaining; once GeDi is compiled, the source code directory cannot be moved 
 without re-compilation (see compilation section below).
@@ -44,12 +43,10 @@ remain to successfully compile GeDi.
 
 Once the depenendancies have been installed and GeDi's source code
 directory is placed in a prefered location, compile GeDi with the following:
-
 ```
 cd GeDi
 bash install.sh
 ```
-
 Compilation of GeDi will now initiate. Once compilation is complete,
 test that GeDi compiled succesfully by executing
 ```
@@ -96,15 +93,15 @@ to the reference genome as a proxy used in the calculation of SNV coordinates;
 they can be deleted. `example_data.SNV_results` contains the SNV calls made
 by GeDi for the example dataset. This file has the following content:
 ```
-Mut_ID	Type	Chr	  Pos	      Normal_NT	Tumor_NT
-0	      SNV	  chr22	19613299	T	        A
+Mut_ID	Type	Chr	Pos	Normal_NT	Tumor_NT
+0	SNV	chr22	19613299	T	A
+
 ```
 When analysing the toy dataset, GeDi detected and called a single SNV on
 chromosome 22 at position 19613299, with control variant T and tumour variant
 A. The column headers of an output `.SNV_results` file describe the following:
   - `MuT_ID` assigns to each all an arbitrary unique number. 
-  - `Type` specifies the type of variant GeDi called - current version of GeDi only
-  - calls SNVs.
+  - `Type` specifies the type of variant GeDi called - current version of GeDi only calls SNVs.
   - `Chr` specifies the chromosome the SNV resides.
   - `Pos` specifies the 1-indexed chromosome position of the SNV.
   - `Normal_NT` specifies the control variant of the SNV.
@@ -118,13 +115,16 @@ To run GeDi in default mode, the main substitution is to ensure
 the `.file_list` file contains the list of `fastq` files comprising
 the users own dataset.
 
-Although issuing `./GeDi --help` provides information on the arguments
-that must be passed to GeDi's command line parameters, we explain what
-must be passed to the most important parameters here:
+Although issuing `./GeDi --help` on the command line will print information
+regarding the arguments that must be passed to GeDi's parameters and parameter
+function. Here, we explain what must be passed to the most important of GeDi's
+parameters (each of which was specified in the above example):
  - `-i` must be given the path the users `.file_list`.
- - `-c` If specified, GeDi will filter out all SNV calls made on chromosomes
-        that do not match the argument. If not specified, GeDI will report
-
+ - `-c` If specified, GeDi will filter out all SNV calls that do not
+        reside within the specified chromosome. Note that, this argument
+        should exactly match the fasta header within the reference genome
+        used for alignment. If not specified, GeDI will report
+        all SNVs called regardless of the chromosome they reside in.
  - `-v` Expected or average coverage of the dataset.
  - `-t` number of threads GeDi will execute with during parallel sections
  - `-x` the location and prefix of the bowtie2 human reference genome index.
