@@ -1,4 +1,4 @@
-#GeDi: Generalised suffix array-based Direct SNV caller
+# GeDi: Generalised suffix array-based Direct SNV caller
 
 Applying suffix array to increase the repertoire of detectable SNVs 
 in tumour genomes.
