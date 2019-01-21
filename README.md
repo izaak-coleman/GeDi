@@ -58,7 +58,7 @@ which should display GeDi's help message.
 # Running GeDi on example data
 
 Within GeDi's source code directory is an `example_data` subdirectory
-that will be used to explain how to run GeDi in default mode. 
+that will provide an example of how to run GeDi in default mode.
 
 Within `example_data` are the following three files:
   - `example_dataset.file_list`
