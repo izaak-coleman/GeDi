@@ -16,13 +16,15 @@ This work has been published in XXXX.
 
 # Download
 Either clone this repository, or download the zip file containing GeDi source
-code and unzip the source code directory. For example:
+code and unzip the source code directory. To clone the GeDi repo, issue
+the following on the command-line:
 
 ```
 git clone https://github.com/izaak-coleman/GeDi
 ```
-Move the source code directory into a location where you are comforable with 
-it remaining; once GeDi is compiled, the source code directory cannot be moved 
+Move the directory named `GeDi` (source code directory) 
+into a location where you are comforable with it remaining; 
+once GeDi is compiled, the source code directory cannot be moved 
 without re-compilation (see compilation section below).
 
 
@@ -40,6 +42,10 @@ remain to successfully compile GeDi.
   - `g++` version 4.8.1 or greater
   - boost program options library. On CentOS, install with `yum install
   boost-devel.x86_64`, on Ubuntu with `sudo apt-get install libboost-all-dev`.
+  - A bowtie2 index of a reference genome. For example, `ucsc.hg19.fasta`
+    can be build by installing bowtie2 and issuing `bowtie2-build
+    ucsc.hg19.fasta ucsc.hg19.fasta`, see [bowtie2 reference manual](http://bowtie-bio.sourceforge.net/bowtie2/manual.shtml)
+    for further details.
 
 Once the depenendancies have been installed and GeDi's source code
 directory is placed in a prefered location, compile GeDi with the following:
@@ -129,7 +135,9 @@ parameters (each of which was specified in the above example):
  - `-t` number of threads GeDi will execute with during parallel sections
  - `-x` the location and prefix of the bowtie2 human reference genome index.
         Note this argument passed to this parameter should be identical to the
-        argument one would pass to `-x` if running bowtie2.
+        argument one would pass to `-x` if running bowtie2. See
+        [bowtie2 reference manual](http://bowtie-bio.sourceforge.net/bowtie2/manual.shtml) 
+        for a further explaination of bowtie2's `-x` parameter.
  - `-o` prefix of the output files produced by GeDi. This can include a file
         path, and GeDi will write files with the prefix at the specified location.
 
