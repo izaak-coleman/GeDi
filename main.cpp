@@ -56,18 +56,18 @@ int main(int argc, char** argv)
        "suffix array. Integer ranged [1, maxint].\n")
 
       ("emfilter", po::value<string>()->default_value(EMFIL),
-       "Apply emfilter to input tumour data.(on|off)\n")
+       "Apply emfilter to input tumour data (on|off).\n")
 
       ("auxiliary_mss",  po::value<int>()->default_value(AUX_MSS), 
-       "Minimum suffix size of sections extracted from the auxiliary GSA. " 
+       "Minimum suffix size of sections extracted from the auxiliary suffix array. " 
        "Integer ranged [1, maxint].\n")
 
       ("min_phred,h", po::value<int>()->default_value(MIN_PHRED_QUAL),
-       "Minimum phred score of base contributing to a phred-filtered " 
+       "Minimum phred score of a base contributing to a phred-filtered " 
        "consensus sequence Base-33 phred score. Integer ranged [0,42]\n")
 
       ("max_allele_freq_of_error,f", po::value<double>()->default_value(ALLELE_FREQ_OF_ERR), 
-       "All candidate variants with an allele frequency equal to or below "
+       "Used in masking filter's indicator function. All candidate variants with an allele frequency equal to or below "
         "this value will be considered sequencing errors and discarded. " 
         "Real number ranged [0,1]\n")
       
@@ -82,24 +82,26 @@ int main(int argc, char** argv)
        "below this value will be discarded. Integer ranged [0,42] \n.")
 
       ("expected_contamination,e", po::value<double>()->default_value(ECONT),
-       "Proportion of cancer dataset expected to contain healthy-tissue " 
-       "derived reads. Real number ranged [0,1].\n")
+       "Proportion of sequencing reads within the tumour dataset expected to derive from healthy tissue. " 
+       "Real number ranged [0,1].\n")
 
       ("chromosome,c", po::value<string>()->default_value(CHR), 
-       "For targeted sequencing data analysis. Only control consensus "  
-       "consensus sequenceswith RNAME identical to the given value "  
-       "will be considered for further analysis. Leaving this unspecified "  
-       "removes constraint, allowing GeDi to analyse WGS datasets. \n")
+       "For targeted sequencing data analysis. If specified, GeDi will filter "  
+       "out all SNV calls that do not reside within the specified chromosome. "  
+       "Note that the passed argument should exactly match the fasta header of "  
+       "the desired chromosome within the reference genome used for alignment. "  
+       "If not specified, GeDi will report all SNVs called regardless of the "
+       "chromosome they reside in. (string). \n")
 
       ("expected_coverage,v", po::value<int>()->required(), 
-       "Expected coverage of input datasets. Integer range [0,maxint]. Required.\n")
+       "Expected coverage of input dataset. Integer range [0,maxint]. Required.\n")
 
       ("n_threads,t", po::value<int>()->required(), 
-       "Number of threads. Integer. Required ranged [1,maxint].\n")
+       "Number of threads GeDi will execute with during parallel sections. Integer. Required ranged [1,maxint].\n")
 
 
       ("input_files,i", po::value<string>()->required(), 
-       "Path and name of file containing list of input fastq files. Required.\n")
+       "Path and file name of the users .file_list. Required.\n")
 
       ("bt2-idx,x", po::value<string>()->required(), 
        "Basename of Bowtie2 reference genome index. Specified value " 
@@ -120,6 +122,8 @@ int main(int argc, char** argv)
                   << "***********************************************************************" << std::endl
                   << std::endl << std::endl;
         std::cout << "usage: [optional parameters] -v coverage -t n_threads -i fastq_list -x bowtie_index -o output_file_basename"
+                  << std::endl << std::endl
+                  << "Default values passed to parameters are in parentheses." 
                   << std::endl;
         std::cout << desc 
                   << std::endl; 

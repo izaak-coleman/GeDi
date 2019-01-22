@@ -140,7 +140,7 @@ parameters (each of which was specified in the above example):
  - `-c` If specified, GeDi will filter out all SNV calls that do not
         reside within the specified chromosome. Note that the passed argument
         should *exactly* match the fasta header of the desired chromosome 
-        within the reference genome used for alignment. If not specified, GeDI will report
+        within the reference genome used for alignment. If not specified, GeDi will report
         all SNVs called regardless of the chromosome they reside in.
  - `-v` Expected or average coverage of the dataset.
  - `-t` Number of threads GeDi will execute with during parallel sections
