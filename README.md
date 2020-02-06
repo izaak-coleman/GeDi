@@ -17,7 +17,7 @@ aligns tumour data to the reference genome. This enables GeDi
 to detect SNVs at complex variant loci, such as sites of hypermutation,
 with high sensitivity.
 
-This work has been published in Coleman, I., Corleone, G., Arram, J. et al. GeDi: applying suffix arrays to increase the repertoire of detectable SNVs in tumour genomes. BMC Bioinformatics 21, 45 (2020). https://doi.org/10.1186/s12859-020-3367-3.
+This work has been published in Coleman, I., Corleone, G., Arram, J. et al. **GeDi: applying suffix arrays to increase the repertoire of detectable SNVs in tumour genomes.** BMC Bioinformatics 21, 45 (2020). https://doi.org/10.1186/s12859-020-3367-3.
 
 
 # Download
