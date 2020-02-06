@@ -156,4 +156,4 @@ parameters (each of which was specified in the above example):
         expected to have derived from healthy tissue.
 
 The function of remaining parameters can be found by issuing `GeDi --help` on
-the command-line. For further details consult XXX.
+the command-line. 
